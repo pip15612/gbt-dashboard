@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GBT Analysis — CME Gold GEX</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+  --text:#e6edf3; --muted:#8b949e;
+  --green:#2ea043; --green-l:#3fb950;
+  --red:#da3633;   --red-l:#f85149;
+  --gold:#d29922;  --gold-l:#e3b341;
+  --blue:#1f6feb;  --blue-l:#58a6ff;
+  --purple:#8957e5; --purple-l:#a371f7;
+  --r:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;}
+
+/* ── Setup ── */
+#setup-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:460px;max-width:95vw;}
+.setup-card h2{font-size:18px;margin-bottom:6px;}
+.setup-card p{color:var(--muted);font-size:13px;margin-bottom:20px;line-height:1.6;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:11px;font-weight:700;margin-bottom:5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.form-group input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:var(--r);font-size:13px;font-family:'Fira Code',monospace;outline:none;transition:border-color .15s;}
+.form-group input:focus{border-color:var(--blue-l);}
+#setup-error{display:none;background:rgba(218,54,51,.15);border:1px solid rgba(218,54,51,.4);color:var(--red-l);padding:10px 14px;border-radius:var(--r);font-size:12px;line-height:1.5;margin-bottom:14px;}
+.btn-primary{width:100%;background:var(--gold);color:#000;border:none;padding:10px 20px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;transition:background .15s;}
+.btn-primary:hover{background:var(--gold-l);}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed;}
+
+/* ── Header ── */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--gold),var(--gold-l));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-text{font-size:17px;font-weight:700;}
+.logo-sub{font-size:10px;color:var(--muted);}
+.badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-bkk{background:rgba(88,166,255,.1);color:var(--blue-l);border:1px solid rgba(88,166,255,.2);}
+.badge-live{background:rgba(46,160,67,.2);color:var(--green-l);border:1px solid rgba(46,160,67,.4);}
+
+/* ── Main Tabs ── */
+.main-tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;gap:0;}
+.main-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.main-tab:hover{color:var(--text);}
+.main-tab.active{color:var(--gold-l);border-bottom-color:var(--gold-l);}
+
+/* ── Controls ── */
+.controls{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.seg{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.seg button{background:transparent;border:none;color:var(--muted);padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.seg button.active{background:var(--gold);color:#000;}
+.seg button:hover:not(.active){color:var(--text);}
+.snapshot-row{display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0;}
+.snap-btn{background:var(--bg);border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.snap-btn:hover{border-color:var(--gold);color:var(--text);}
+.snap-btn.active{border-color:var(--gold);background:rgba(210,153,34,.15);color:var(--gold-l);}
+.icon-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:6px 11px;border-radius:var(--r);font-size:12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
+.icon-btn:hover{border-color:var(--muted);color:var(--text);}
+.icon-btn.spinning .spin-icon{animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── Alpha Slider ── */
+.alpha-row{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:14px;}
+.alpha-row label{font-size:12px;color:var(--muted);white-space:nowrap;}
+.alpha-row input[type=range]{flex:1;accent-color:var(--gold);cursor:pointer;}
+.alpha-val{font-size:12px;font-weight:700;color:var(--gold-l);min-width:30px;}
+.alpha-desc{font-size:11px;color:var(--muted);}
+
+/* ── Metrics ── */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border);}
+.metric-card{background:var(--surface);padding:12px 18px;}
+.metric-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+.metric-value{font-size:20px;font-weight:700;line-height:1;}
+.metric-sub{font-size:10px;color:var(--muted);margin-top:3px;}
+.val-gold{color:var(--gold-l);} .val-green{color:var(--green-l);} .val-red{color:var(--red-l);} .val-blue{color:var(--blue-l);} .val-purple{color:var(--purple-l);} .val-n{color:var(--text);}
+
+/* ── Expected Range Bar ── */
+.range-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.range-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+.range-dot{width:10px;height:10px;border-radius:50%;}
+.range-label{color:var(--muted);}
+.range-val{font-weight:700;}
+
+/* ── Chart Section ── */
+.chart-section{padding:16px 20px;display:flex;flex-direction:column;gap:14px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;}
+.chart-title{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;}
+.chart-wrap{position:relative;height:380px;}
+.chart-wrap-sm{position:relative;height:220px;}
+
+/* ── Key Levels ── */
+.levels-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
+.level-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;}
+.level-label{font-size:10px;color:var(--muted);font-weight:700;margin-bottom:3px;}
+.level-value{font-size:18px;font-weight:700;}
+.level-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── Guide Tab ── */
+.guide-section{padding:20px;max-width:860px;margin:0 auto;}
+.guide-section h2{font-size:22px;font-weight:700;margin-bottom:8px;}
+.guide-section .subtitle{color:var(--muted);font-size:13px;margin-bottom:28px;line-height:1.6;}
+.guide-part{margin-bottom:32px;}
+.guide-part h3{font-size:16px;font-weight:700;margin-bottom:14px;color:var(--gold-l);display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.accordion{border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:8px;}
+.accordion summary{padding:13px 16px;cursor:pointer;font-size:13px;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px;background:var(--surface);transition:background .15s;}
+.accordion summary:hover{background:var(--surface2);}
+.accordion summary::after{content:'›';margin-left:auto;font-size:16px;color:var(--muted);transition:transform .2s;}
+.accordion[open] summary::after{transform:rotate(90deg);}
+.accordion-body{padding:16px;background:var(--surface2);border-top:1px solid var(--border);font-size:13px;line-height:1.8;color:#c9d1d9;}
+.accordion-body p{margin-bottom:10px;}
+.accordion-body p:last-child{margin-bottom:0;}
+.formula{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:'Fira Code',monospace;font-size:12px;color:var(--gold-l);margin:8px 0;}
+.tip{background:rgba(46,160,67,.1);border-left:3px solid var(--green-l);padding:10px 14px;border-radius:0 6px 6px 0;margin:8px 0;font-size:12px;color:var(--green-l);}
+.warn{background:rgba(218,54,51,.1);border-left:3px solid var(--red-l);padding:10px 14px;border-radius:0 6px 6px 0;margin:8px 0;font-size:12px;color:var(--red-l);}
+.hl-gold{color:var(--gold-l);font-weight:700;}
+.hl-green{color:var(--green-l);font-weight:700;}
+.hl-red{color:var(--red-l);font-weight:700;}
+.hl-blue{color:var(--blue-l);font-weight:700;}
+
+/* ── Tabs pages ── */
+.tab-page{display:none;}
+.tab-page.active{display:block;}
+
+/* ── Zone Planner ── */
+.zp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;}
+.zp-row label{font-size:12px;color:var(--muted);white-space:nowrap;}
+.zp-row input,.zp-row select{width:160px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-size:13px;font-family:'Fira Code',monospace;outline:none;transition:border-color .15s;}
+.zp-row input:focus{border-color:var(--gold-l);}
+.zone-row{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:6px;font-size:13px;}
+.zone-row .zone-label{width:80px;font-size:11px;font-weight:700;color:var(--muted);}
+.zone-row .zone-price{font-weight:700;font-family:'Fira Code',monospace;flex:1;}
+.zone-row .zone-desc{font-size:11px;color:var(--muted);}
+.zone-atm{background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.3);}
+.zone-1{background:rgba(31,111,235,.08);border:1px solid rgba(31,111,235,.2);}
+.zone-2{background:rgba(139,87,229,.08);border:1px solid rgba(139,87,229,.2);}
+.zone-3{background:rgba(218,54,51,.08);border:1px solid rgba(218,54,51,.2);}
+.zp-out{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;}
+.zp-out-label{font-size:10px;color:var(--muted);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;}
+.zp-out-val{font-size:18px;font-weight:700;}
+.zp-table{width:100%;border-collapse:collapse;font-size:12px;}
+.zp-table th{color:var(--muted);font-weight:700;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);}
+.zp-table td{padding:7px 8px;border-bottom:1px solid rgba(48,54,61,.5);}
+.row-hi td:nth-child(2){color:var(--green-l);font-weight:700;}
+.row-mid td:nth-child(2){color:var(--gold-l);font-weight:700;}
+.row-low td:nth-child(2){color:var(--red-l);}
+.row-none td:nth-child(2){color:var(--red-l);font-weight:700;}
+
+/* ── Loader ── */
+.loader{display:flex;align-items:center;justify-content:center;height:260px;gap:10px;color:var(--muted);}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
+
+/* ── Zone Decision Engine (Hero Panel) ── */
+.zde-wrap{background:linear-gradient(180deg,var(--surface) 0%,var(--bg) 100%);border-bottom:1px solid var(--border);padding:14px 20px;}
+.zde-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.zde-header{display:flex;align-items:center;justify-content:space-between;padding:9px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.zde-title{font-size:11px;font-weight:800;color:var(--gold-l);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px;}
+.zde-conf{font-size:11px;color:var(--muted);font-weight:700;}
+.zde-conf .zde-confnum{color:var(--text);font-size:13px;margin-left:4px;font-family:'Fira Code',monospace;}
+.zde-body{display:grid;grid-template-columns:260px 1fr 320px;gap:0;}
+.zde-verdict{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;}
+.zde-verdict.long{background:linear-gradient(135deg,rgba(46,160,67,.18),rgba(46,160,67,.04));}
+.zde-verdict.short{background:linear-gradient(135deg,rgba(218,54,51,.18),rgba(218,54,51,.04));}
+.zde-verdict.neutral{background:linear-gradient(135deg,rgba(139,148,158,.10),rgba(139,148,158,.03));}
+.zde-icon{font-size:28px;line-height:1;margin-bottom:4px;}
+.zde-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
+.zde-action{font-size:22px;font-weight:800;margin:5px 0;letter-spacing:.02em;line-height:1.1;}
+.zde-action.long{color:var(--green-l);}
+.zde-action.short{color:var(--red-l);}
+.zde-action.neutral{color:var(--muted);}
+.zde-tagline{font-size:11px;color:var(--muted);line-height:1.5;max-width:220px;}
+.zde-confbar{margin-top:10px;width:160px;height:7px;background:var(--bg);border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.zde-confbar-fill{height:100%;background:linear-gradient(90deg,var(--red-l),var(--gold-l),var(--green-l));transition:width .3s;}
+.zde-plan{padding:14px 20px;border-right:1px solid var(--border);}
+.zde-plan-title{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px;}
+.zde-prices{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:11px;}
+.zde-pcell{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:9px 11px;}
+.zde-pcell-label{font-size:9.5px;color:var(--muted);font-weight:700;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em;}
+.zde-pcell-val{font-size:17px;font-weight:700;font-family:'Fira Code',monospace;line-height:1.2;}
+.zde-pcell-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.zde-pcell.entry{border-color:rgba(210,153,34,.35);}
+.zde-pcell.entry .zde-pcell-val{color:var(--gold-l);}
+.zde-pcell.stop{border-color:rgba(218,54,51,.35);}
+.zde-pcell.stop .zde-pcell-val{color:var(--red-l);}
+.zde-pcell.target{border-color:rgba(46,160,67,.35);}
+.zde-pcell.target .zde-pcell-val{color:var(--green-l);}
+.zde-rr-row{display:flex;align-items:center;gap:14px;font-size:12px;flex-wrap:wrap;}
+.zde-rr-row span{color:var(--muted);}
+.zde-rr-row strong{color:var(--text);font-weight:700;}
+.zde-reasons{padding:13px 18px;background:var(--bg);}
+.zde-reasons-title{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.zde-reason{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;line-height:1.45;padding:2.5px 0;color:var(--text);}
+.zde-reason .zde-rmark{flex-shrink:0;width:13px;font-weight:700;}
+.zde-reason.pos .zde-rmark{color:var(--green-l);}
+.zde-reason.neg .zde-rmark{color:var(--red-l);}
+.zde-reason.warn .zde-rmark{color:var(--gold-l);}
+.zde-reason .zde-rtxt{flex:1;}
+.zde-reason .zde-rscore{margin-left:auto;font-size:10px;color:var(--muted);font-weight:700;font-family:'Fira Code',monospace;flex-shrink:0;}
+.zde-meta-row{padding:8px 18px;background:var(--surface2);border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;font-size:11px;align-items:center;}
+.zde-chip{padding:3px 9px;border-radius:12px;background:var(--bg);border:1px solid var(--border);color:var(--muted);font-weight:700;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.zde-chip.ok{color:var(--green-l);border-color:rgba(46,160,67,.4);background:rgba(46,160,67,.08);}
+.zde-chip.warn{color:var(--gold-l);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.08);}
+.zde-chip.danger{color:var(--red-l);border-color:rgba(218,54,51,.4);background:rgba(218,54,51,.08);}
+.zde-chip.info{color:var(--blue-l);border-color:rgba(31,111,235,.4);background:rgba(31,111,235,.08);}
+
+@media(max-width:1100px){
+  .zde-body{grid-template-columns:1fr;}
+  .zde-verdict,.zde-plan{border-right:none;border-bottom:1px solid var(--border);}
+}
+
+/* ── OI Change card ── */
+.delta-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;}
+.delta-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.delta-head-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.delta-head-meta{font-size:11px;color:var(--muted);}
+.delta-totals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.delta-totals .zp-out{background:var(--bg);padding:10px 12px;}
+.delta-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.delta-col-title{font-size:11px;font-weight:700;margin-bottom:6px;letter-spacing:.03em;text-transform:uppercase;}
+.delta-col-title.up{color:var(--green-l);}
+.delta-col-title.dn{color:var(--red-l);}
+.delta-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:5px;font-size:12px;font-family:'Fira Code',monospace;}
+.delta-row:nth-child(odd){background:rgba(255,255,255,.025);}
+.delta-row .ds{flex:0 0 60px;font-weight:700;}
+.delta-row .dt{flex:0 0 18px;color:var(--muted);}
+.delta-row .dv{font-weight:700;flex:1;text-align:right;}
+.delta-row.up .dv{color:var(--green-l);}
+.delta-row.dn .dv{color:var(--red-l);}
+
+/* ── Block Strategy / Recovery ── */
+.block-rec{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:13px;color:var(--muted);}
+.block-rec strong{color:var(--text);font-family:'Fira Code',monospace;}
+.block-pill{padding:4px 11px;border-radius:14px;font-weight:700;font-size:12px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+.block-pill.active{background:rgba(210,153,34,.15);border-color:rgba(210,153,34,.5);color:var(--gold-l);}
+.setup-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;}
+.setup-table th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);}
+.setup-table td{padding:8px;border-bottom:1px solid rgba(48,54,61,.5);}
+.setup-table td:nth-child(2),.setup-table td:nth-child(3){font-family:'Fira Code',monospace;font-weight:700;}
+.setup-table td:nth-child(2){color:var(--red-l);}
+.setup-table td:nth-child(3){color:var(--green-l);}
+.setup-table td:nth-child(4){color:var(--gold-l);font-weight:700;}
+.rec-calc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-top:10px;}
+.rec-calc-title{font-size:12px;font-weight:700;color:var(--gold-l);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.rec-calc-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+.rec-calc-row label{min-width:130px;}
+.rec-calc-row input,.rec-calc-row select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px;font-family:'Fira Code',monospace;width:100px;}
+.rec-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
+.rec-table th{font-size:10px;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);}
+.rec-table td{padding:6px 8px;border-bottom:1px solid rgba(48,54,61,.5);font-family:'Fira Code',monospace;}
+.rec-table .rec-lot{color:var(--gold-l);font-weight:700;}
+.rec-table .rec-win{color:var(--green-l);}
+.rec-table .rec-loss{color:var(--red-l);}
+
+/* ── Mobile / responsive ── */
+@media(max-width:900px){
+  .header{flex-direction:column;align-items:flex-start;gap:6px;padding:9px 12px;}
+  .main-tabs{padding:0 8px;overflow-x:auto;}
+  .main-tab{padding:8px 10px;font-size:12px;}
+  .controls{padding:8px 12px;gap:8px;}
+  .alpha-row{padding:7px 12px;}
+  .metrics{grid-template-columns:repeat(2,1fr);}
+  .metric-card{padding:9px 12px;}
+  .metric-value{font-size:17px;}
+  .range-bar{padding:8px 12px;gap:10px;font-size:11px;}
+  .zde-wrap{padding:10px 12px;}
+  .zde-body{grid-template-columns:1fr;}
+  .zde-verdict,.zde-plan{border-right:none;border-bottom:1px solid var(--border);}
+  .zde-prices{grid-template-columns:repeat(3,1fr);gap:6px;}
+  .zde-pcell{padding:7px 8px;}
+  .zde-pcell-val{font-size:14px;}
+  .chart-section{padding:10px 12px;gap:10px;}
+  .chart-card{padding:12px 14px;}
+  .chart-wrap{height:260px;}
+  /* Zone Planner — stack everything */
+  #tab-deltarange > div{padding:10px 12px !important;}
+  #tab-deltarange [style*="grid-template-columns:340px"]{grid-template-columns:1fr !important;}
+  #tab-deltarange [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important;}
+  #sizer-grid{grid-template-columns:repeat(2,1fr) !important;}
+  .delta-cols{grid-template-columns:1fr;}
+  .delta-totals{grid-template-columns:1fr 1fr;}
+  .zp-row label{font-size:11px;}
+  .zp-row input,.zp-row select{width:130px;font-size:12px;}
+  .guide-section{padding:14px 12px;}
+}
+@media(max-width:560px){
+  .metrics{grid-template-columns:1fr 1fr;}
+  .delta-totals{grid-template-columns:1fr;}
+  .zde-prices{grid-template-columns:1fr;}
+  .zde-pcell-val{font-size:16px;}
+  .setup-table{font-size:11px;}
+  .setup-table th,.setup-table td{padding:5px 4px;}
+}
+</style>
+</head>
+<body>
+
+<!-- Setup -->
+<div id="setup-overlay">
+  <div class="setup-card">
+    <div style="font-size:26px;margin-bottom:10px;">💣</div>
+    <h2>GBT Analysis Dashboard</h2>
+    <p>ข้อมูลมาจาก <strong style="color:var(--green-l)">public repo</strong> <code style="color:var(--gold-l)">pageth/Vol2VolData</code><br>ไม่ต้องใส่ token ก็ได้ — ใส่เพื่อเพิ่ม rate limit จาก 60→5000 req/hr</p>
+    <div class="form-group">
+      <label>GitHub Token (PAT) — Optional</label>
+      <input type="password" id="token-input" placeholder="ghp_... (optional)">
+    </div>
+    <div class="form-group">
+      <label>Data Repository</label>
+      <input type="text" id="repo-input" value="pageth/Vol2VolData">
+    </div>
+    <div id="setup-error"></div>
+    <button class="btn-primary" onclick="startDashboard()">Load Dashboard →</button>
+    <p style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;">Token เก็บใน memory เท่านั้น ไม่มีการบันทึก</p>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">💣</div>
+    <div>
+      <div class="logo-text">GBT Analysis</div>
+      <div class="logo-sub">Gamma Bomb Trap · CME Gold Options</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="badge badge-bkk" id="bkk-time">BKK --:--</span>
+    <span class="badge badge-live">LIVE</span>
+    <span style="font-size:11px;color:var(--muted)" id="freshness">—</span>
+  </div>
+</div>
+
+<!-- Main nav tabs -->
+<div class="main-tabs">
+  <button class="main-tab active" onclick="switchTab('gex')">📊 GEX Analysis</button>
+  <button class="main-tab" onclick="switchTab('cumulative')">∑ Cumulative GEX</button>
+  <button class="main-tab" onclick="switchTab('deltarange')">📐 Zone Planner</button>
+  <button class="main-tab" onclick="switchTab('guide')">📖 คู่มืออ่านค่า</button>
+</div>
+
+<!-- GEX + Cumulative pages share controls -->
+<div id="chart-controls">
+  <!-- Controls bar -->
+  <div class="controls">
+    <div class="seg" id="mode-seg">
+      <button id="btn-intraday" class="active" onclick="setMode('intraday')">📊 Intraday Vol</button>
+      <button id="btn-oi" onclick="setMode('oi')">📈 Open Interest</button>
+      <button id="btn-composite" onclick="setMode('composite')">⚡ Composite</button>
+    </div>
+    <div class="snapshot-row" id="snapshot-row">
+      <span style="color:var(--muted);font-size:12px;">Loading…</span>
+    </div>
+    <button class="icon-btn" onclick="refreshData()" id="refresh-btn" title="Refresh data">
+      <span class="spin-icon">↻</span> Refresh
+    </button>
+    <button class="icon-btn" onclick="showSetup()">⚙ Settings</button>
+  </div>
+
+  <!-- Alpha slider (composite mode only) -->
+  <div class="alpha-row" id="alpha-row" style="display:none;">
+    <label>α — Intraday Weight</label>
+    <input type="range" id="alpha-slider" min="0" max="1" step="0.05" value="0.4" oninput="onAlphaChange()">
+    <span class="alpha-val" id="alpha-val">0.40</span>
+    <span class="alpha-desc">0 = OI only · 0.4 recommended · 1 = Vol only</span>
+  </div>
+
+  <!-- Metrics row -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-label">Futures Price</div>
+      <div class="metric-value val-gold" id="m-price">—</div>
+      <div class="metric-sub" id="m-price-chg">Future Chg: —</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">ATM IV</div>
+      <div class="metric-value val-blue" id="m-iv">—</div>
+      <div class="metric-sub" id="m-iv-chg">Vol Chg: —</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">DTE</div>
+      <div class="metric-value val-n" id="m-dte">—</div>
+      <div class="metric-sub">Days to Expiry</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Put / Call</div>
+      <div class="metric-value" id="m-pc">—</div>
+      <div class="metric-sub" id="m-pc-sub">Put: — Call: —</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Net GEX</div>
+      <div class="metric-value" id="m-gex">—</div>
+      <div class="metric-sub" id="m-gex-bias">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">1σ Range (Expiry)</div>
+      <div class="metric-value val-purple" id="m-r16exp">—</div>
+      <div class="metric-sub" id="m-r16exp-range">±—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">1σ Range (1D)</div>
+      <div class="metric-value val-purple" id="m-r16day">—</div>
+      <div class="metric-sub" id="m-r16day-range">±—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">IV Rank (Session)</div>
+      <div class="metric-value" id="m-ivrank">—</div>
+      <div class="metric-sub" id="m-ivrank-sub">สูง=IV แพง ต่ำ=IV ถูก</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Vol Skew (P−C)</div>
+      <div class="metric-value" id="m-skew">—</div>
+      <div class="metric-sub" id="m-skew-sub">+= Put แพง (Bearish hedge)</div>
+    </div>
+  </div>
+
+  <!-- Expected range summary -->
+  <div class="range-bar" id="range-bar">
+    <span style="font-size:11px;color:var(--muted);font-weight:700;">EXPECTED RANGE:</span>
+    <div class="range-item"><div class="range-dot" style="background:rgba(139,87,229,.5);"></div><span class="range-label">1σ Exp</span> <span class="range-val val-purple" id="rb-1exp">—</span></div>
+    <div class="range-item"><div class="range-dot" style="background:rgba(139,87,229,.25);"></div><span class="range-label">2σ Exp</span> <span class="range-val" style="color:#a371f7" id="rb-2exp">—</span></div>
+    <div class="range-item"><div class="range-dot" style="background:rgba(31,111,235,.4);"></div><span class="range-label">1σ 1D</span> <span class="range-val val-blue" id="rb-1day">—</span></div>
+    <div class="range-item"><span class="range-label">DGC Wall</span> <span class="range-val val-gold" id="rb-dgc">—</span></div>
+    <div class="range-item"><span class="range-label">+Wall</span> <span class="range-val val-green" id="rb-cwall">—</span></div>
+    <div class="range-item"><span class="range-label">−Wall</span> <span class="range-val val-red" id="rb-pwall">—</span></div>
+    <span id="rb-open-label" style="font-size:11px;color:var(--muted);margin-left:auto;"></span>
+  </div>
+
+  <!-- 🎯 Zone Decision Engine (Today's Edge) -->
+  <div class="zde-wrap">
+    <div class="zde-card" id="zde-card">
+      <div class="zde-header">
+        <div class="zde-title">🎯 Today's Edge — Zone Decision Engine</div>
+        <div class="zde-conf">Confidence: <span class="zde-confnum" id="zde-confnum">—</span></div>
+      </div>
+      <div class="zde-body">
+        <div class="zde-verdict neutral" id="zde-verdict">
+          <div class="zde-icon" id="zde-icon">⏳</div>
+          <div class="zde-label" id="zde-vlabel">Verdict</div>
+          <div class="zde-action neutral" id="zde-action">Waiting for data…</div>
+          <div class="zde-tagline" id="zde-tagline">รอข้อมูล snapshot โหลด</div>
+          <div class="zde-confbar"><div class="zde-confbar-fill" id="zde-confbar" style="width:0%;"></div></div>
+        </div>
+        <div class="zde-plan">
+          <div class="zde-plan-title">📋 Trade Plan</div>
+          <div class="zde-prices">
+            <div class="zde-pcell entry">
+              <div class="zde-pcell-label">🎯 Entry</div>
+              <div class="zde-pcell-val" id="zde-entry">—</div>
+              <div class="zde-pcell-sub" id="zde-entry-sub">—</div>
+            </div>
+            <div class="zde-pcell stop">
+              <div class="zde-pcell-label">🛑 Stop</div>
+              <div class="zde-pcell-val" id="zde-stop">—</div>
+              <div class="zde-pcell-sub" id="zde-stop-sub">—</div>
+            </div>
+            <div class="zde-pcell target">
+              <div class="zde-pcell-label">🏁 Target</div>
+              <div class="zde-pcell-val" id="zde-target">—</div>
+              <div class="zde-pcell-sub" id="zde-target-sub">—</div>
+            </div>
+          </div>
+          <div class="zde-rr-row">
+            <span>R:R = <strong id="zde-rr">—</strong></span>
+            <span>Win prob (hist): <strong id="zde-winp">—</strong></span>
+            <span>Position @ Zone Planner risk: <strong id="zde-lots">—</strong> lots</span>
+          </div>
+        </div>
+        <div class="zde-reasons">
+          <div class="zde-reasons-title">🧮 Signal Breakdown</div>
+          <div id="zde-reasons">
+            <div class="zde-reason"><span class="zde-rmark">•</span><span class="zde-rtxt" style="color:var(--muted);">รอข้อมูล…</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="zde-meta-row" id="zde-meta">
+        <span class="zde-chip">Loading…</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tab: GEX Analysis -->
+<div id="tab-gex" class="tab-page active">
+  <div class="chart-section">
+    <div class="chart-card">
+      <div class="chart-title">
+        <span id="gex-chart-title">Gamma Exposure (GEX) by Strike</span>
+        <span style="color:var(--muted);font-size:10px;">แท่งเขียว = Call dominant · แท่งแดง = Put dominant</span>
+      </div>
+      <div class="chart-wrap"><canvas id="gex-chart"></canvas></div>
+    </div>
+
+    <!-- ΔOI vs Previous Snapshot -->
+    <div class="delta-card" id="delta-card">
+      <div class="delta-head">
+        <div class="delta-head-title">📊 Call/Put Change vs Previous Snapshot</div>
+        <div class="delta-head-meta" id="delta-meta">โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ</div>
+      </div>
+      <div class="delta-totals" id="delta-totals">
+        <div class="zp-out"><div class="zp-out-label">ΔCall Total</div><div class="zp-out-val val-n" id="delta-call-total">—</div></div>
+        <div class="zp-out"><div class="zp-out-label">ΔPut Total</div><div class="zp-out-val val-n" id="delta-put-total">—</div></div>
+        <div class="zp-out"><div class="zp-out-label">Net Quadrant</div><div class="zp-out-val val-n" id="delta-quadrant" style="font-size:13px;">—</div></div>
+      </div>
+      <div class="delta-cols">
+        <div>
+          <div class="delta-col-title up">▲ Top Build-up (Long OI / Volume)</div>
+          <div id="delta-up-list"><div style="color:var(--muted);font-size:11px;padding:8px;">รอข้อมูล…</div></div>
+        </div>
+        <div>
+          <div class="delta-col-title dn">▼ Top Unwind (Position closed)</div>
+          <div id="delta-dn-list"><div style="color:var(--muted);font-size:11px;padding:8px;">รอข้อมูล…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Key Levels</div>
+      <div class="levels-grid" id="levels-grid"><div style="color:var(--muted);font-size:13px;">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab: Cumulative GEX -->
+<div id="tab-cumulative" class="tab-page">
+  <div class="chart-section">
+    <div class="chart-card">
+      <div class="chart-title">
+        <span>Cumulative GEX (Σ) — Gamma Flip Point</span>
+        <span style="color:var(--muted);font-size:10px;">เส้นข้ามศูนย์ = Gamma Flip</span>
+      </div>
+      <div class="chart-wrap"><canvas id="cum-chart"></canvas></div>
+    </div>
+    <div class="chart-card" style="padding:16px 20px;">
+      <div class="chart-title">Gamma Flip Analysis</div>
+      <div id="flip-analysis" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab: Zone Planner -->
+<div id="tab-deltarange" class="tab-page">
+<div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+
+  <!-- Row 1: Inputs + Zone Levels -->
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start;">
+
+    <!-- Inputs card -->
+    <div class="chart-card" style="padding:18px 20px;">
+      <div class="chart-title" style="margin-bottom:14px;">⚙️ ตั้งค่า</div>
+      <div class="zp-row"><label>Futures Price ($)</label><input type="number" id="zp-price" step="0.1" oninput="zpCalc()"></div>
+      <div class="zp-row"><label>ATM IV (%)</label><input type="number" id="zp-iv" step="0.01" oninput="zpCalc()"></div>
+      <div class="zp-row"><label>DTE (วัน)</label><input type="number" id="zp-dte" step="0.01" oninput="zpCalc()"></div>
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+      <div class="zp-row"><label>Account Size ($)</label><input type="number" id="zp-account" value="10000" step="100" oninput="zpCalc()"></div>
+      <div class="zp-row"><label>Risk per trade (%)</label><input type="number" id="zp-risk" value="1" step="0.1" min="0.1" max="10" oninput="zpCalc()"></div>
+      <div class="zp-row"><label>Stop Multiplier (σ)</label>
+        <select id="zp-stopmult" onchange="zpCalc()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--r);font-size:13px;">
+          <option value="1">1σ (68% — Tight)</option>
+          <option value="1.5">1.5σ</option>
+          <option value="2" selected>2σ (95% — Standard)</option>
+          <option value="2.5">2.5σ</option>
+          <option value="3">3σ (99.7% — Wide)</option>
+        </select>
+      </div>
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+      <div class="zp-row"><label>Entry Price ($)</label><input type="number" id="zp-entry" step="0.1" oninput="zpRR()"></div>
+      <div class="zp-row"><label>Stop Loss ($)</label><input type="number" id="zp-stop" step="0.1" oninput="zpRR()"></div>
+      <div class="zp-row"><label>Target ($)</label><input type="number" id="zp-target" step="0.1" oninput="zpRR()"></div>
+    </div>
+
+    <!-- Zone + Position output -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <!-- Zone levels -->
+      <div class="chart-card" style="padding:18px 20px;">
+        <div class="chart-title" style="margin-bottom:12px;">📍 โซนราคา (Fixed จาก Open)</div>
+        <div id="zone-grid" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="color:var(--muted);font-size:12px;">กรอกข้อมูลด้านซ้ายเพื่อดูโซน</div>
+        </div>
+      </div>
+
+      <!-- Position size output -->
+      <div class="chart-card" style="padding:18px 20px;">
+        <div class="chart-title" style="margin-bottom:12px;">💰 Position Sizer (GC = $100/point)</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;" id="sizer-grid">
+          <div class="zp-out"><div class="zp-out-label">Risk ($)</div><div class="zp-out-val" id="zp-out-risk">—</div></div>
+          <div class="zp-out"><div class="zp-out-label">Lots (contracts)</div><div class="zp-out-val" id="zp-out-lots">—</div></div>
+          <div class="zp-out"><div class="zp-out-label">Stop Distance</div><div class="zp-out-val" id="zp-out-stop">—</div></div>
+          <div class="zp-out"><div class="zp-out-label">R:R Ratio</div><div class="zp-out-val" id="zp-out-rr">—</div></div>
+          <div class="zp-out"><div class="zp-out-label">Max Loss ($)</div><div class="zp-out-val val-red" id="zp-out-maxloss">—</div></div>
+          <div class="zp-out"><div class="zp-out-label">Target Profit ($)</div><div class="zp-out-val val-green" id="zp-out-profit">—</div></div>
+        </div>
+        <div id="sizer-regime" style="margin-top:12px;padding:10px 14px;border-radius:var(--r);font-size:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Gap Fill + Regime Table side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+    <!-- Gap Fill Table -->
+    <div class="chart-card" style="padding:18px 20px;">
+      <div class="chart-title" style="margin-bottom:12px;">📊 Gap Fill — ทองคำ (1,948 session)</div>
+      <table class="zp-table">
+        <thead><tr><th>Gap Size</th><th>Fill Rate</th><th>กลยุทธ์</th></tr></thead>
+        <tbody>
+          <tr class="row-hi"><td>&lt; $5</td><td>97.6%</td><td>✅ Fade ได้เลย (Edge สูง)</td></tr>
+          <tr class="row-mid"><td>$5 – $10</td><td>87.7%</td><td>⚠️ Fade + รอ Confirmation</td></tr>
+          <tr class="row-mid"><td>$10 – $30</td><td>70–74%</td><td>⚠️ ต้องการ OI Zone + Vol Chg ยืนยัน</td></tr>
+          <tr class="row-low"><td>$30 – $50</td><td>~50%</td><td>❌ เสี่ยงสูง ไม่แนะนำ Fade</td></tr>
+          <tr class="row-none"><td>&gt; $50</td><td>38.7%</td><td>🚫 ไม่มี Edge — Skip หรือ Momentum</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px;">Large Gap Day (&gt;$15): Intraday Reversion 64.4% vs เฉลี่ย 54.7%</p>
+    </div>
+
+    <!-- Regime Table -->
+    <div class="chart-card" style="padding:18px 20px;">
+      <div class="chart-title" style="margin-bottom:12px;">🎚️ Stop Loss & Position ตาม IV Regime</div>
+      <table class="zp-table">
+        <thead><tr><th>Regime</th><th>Rolling RV</th><th>Stop แนะนำ</th><th>Size (%พอร์ต)</th></tr></thead>
+        <tbody>
+          <tr><td>🟢 Low</td><td>&lt;12%</td><td>$8–12</td><td>5–7%</td></tr>
+          <tr><td>🟡 Mid</td><td>12–18%</td><td>$12–20</td><td>3–5%</td></tr>
+          <tr><td>🟠 High</td><td>&gt;18%</td><td>$20–35</td><td>2–3%</td></tr>
+          <tr><td>🔴 Extreme</td><td>&gt;20% (2026)</td><td>$30–60</td><td>1–2%</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--text);">สูตร Position Sizer:</strong><br>
+        Lots = R ÷ (σ × M × Price × 100)<br>
+        <span style="font-size:11px;">R = Risk $, σ = IV decimal, M = Stop mult, 100 = GC multiplier</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2.5: Block Strategy + Recovery Calculator -->
+  <div class="chart-card" style="padding:18px 20px;">
+    <div class="chart-title" style="margin-bottom:12px;">🎰 Block Strategy — เล่นตาม Block $25 / $50 / $100</div>
+    <div class="block-rec" id="block-rec">
+      <span>1σ-Day (กรอบวันนี้) = <strong id="block-sd1d">—</strong></span>
+      <span>→ แนะนำ</span>
+      <span class="block-pill" id="block-pill-25">$25 Block</span>
+      <span class="block-pill" id="block-pill-50">$50 Block</span>
+      <span class="block-pill" id="block-pill-100">$100 Block</span>
+    </div>
+    <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+      จาก Vol2Vol — Strike ที่ราคาลงท้าย <strong style="color:var(--text);">$25 / $50 / $100</strong> มี OI/Volume กระจุกหนักอย่างมีนัยสำคัญ
+      เพราะนักลงทุนนิยมเปิดสถานะที่ตัวเลขกลม (Round-Number Bias) — ทำให้โซนพวกนี้เป็น "กำแพง" ที่ราคาเด้งหรือทะลุได้ชัดเจน
+    </p>
+
+    <table class="setup-table">
+      <thead><tr><th>Setup</th><th>SL</th><th>TP</th><th>R:R</th><th>เหมาะกับวัน</th><th>หมายเหตุ</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1. Pure Block</strong></td><td>$12.5</td><td>$12.5</td><td>1 : 1</td><td>ทุกวัน</td><td>เน้นจำนวนรอบ + recovery flip</td></tr>
+        <tr><td><strong>2. Extended Block</strong></td><td>$12.5</td><td>$25</td><td>1 : 2</td><td>Low/Mid Vol</td><td>Win 1 ครั้ง = คุ้ม Loss 2 ครั้ง</td></tr>
+        <tr><td><strong>3. Big Block</strong></td><td>$25</td><td>$50</td><td>1 : 2</td><td>High Vol (1σ-D &gt; $50)</td><td>ใช้ตอนผันผวนสูง — ลด size</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Recovery Lot Calculator -->
+    <div class="rec-calc">
+      <div class="rec-calc-title">🔄 Recovery Lot Calculator — เมื่อ SL แล้ว Flip ทาง พร้อมเพิ่ม lot ให้ TP ปิด Loss สะสม</div>
+      <div class="rec-calc-row">
+        <label>Initial Lot (สัญญา)</label>
+        <input type="number" id="rec-initlot" value="0.10" step="0.01" min="0.01" oninput="recoveryCalc()">
+        <label>SL distance ($)</label>
+        <input type="number" id="rec-sl" value="12.5" step="0.5" min="1" oninput="recoveryCalc()">
+        <label>TP distance ($)</label>
+        <input type="number" id="rec-tp" value="12.5" step="0.5" min="1" oninput="recoveryCalc()">
+        <label>Max sequence</label>
+        <select id="rec-maxn" onchange="recoveryCalc()">
+          <option value="5">5 ครั้ง</option>
+          <option value="6" selected>6 ครั้ง</option>
+          <option value="7">7 ครั้ง</option>
+          <option value="8">8 ครั้ง</option>
+        </select>
+      </div>
+      <table class="rec-table">
+        <thead><tr><th>Trade</th><th>Direction</th><th>Lot</th><th>ถ้า TP (Win)</th><th>ถ้า SL (Cum Loss)</th><th>Margin ~ ($)</th></tr></thead>
+        <tbody id="rec-tbody"><tr><td colspan="6" style="color:var(--muted);text-align:center;padding:10px;">กรอกค่าเพื่อคำนวณ</td></tr></tbody>
+      </table>
+      <div id="rec-summary" style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.6;"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Volume-OI Quadrant -->
+  <div class="chart-card" style="padding:18px 20px;">
+    <div class="chart-title" style="margin-bottom:12px;">📦 Volume–OI Quadrant (ยืนยันคุณภาพของ Move)</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+      <div style="background:rgba(46,160,67,.1);border:1px solid rgba(46,160,67,.3);border-radius:8px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--green-l);margin-bottom:6px;">📈 ราคา↑ + OI↑ — Long Buildup</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">เทรนด์ขึ้นจริง สถาบันเปิด Long ใหม่<br>→ ตาม Trend ได้ (ระวัง overbought)</div>
+      </div>
+      <div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:8px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--red-l);margin-bottom:6px;">⚠️ ราคา↑ + OI↓ — Short Covering</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">Bull Trap — Short Squeeze ชั่วคราว<br>→ ไม่ตาม Breakout อาจกลับตัวไว</div>
+      </div>
+      <div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:8px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--red-l);margin-bottom:6px;">📉 ราคา↓ + OI↑ — Short Buildup</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">เทรนด์ลงจริง สถาบันเปิด Short ใหม่<br>→ ตาม Downtrend ได้ อย่าต้าน</div>
+      </div>
+      <div style="background:rgba(139,87,229,.1);border:1px solid rgba(139,87,229,.3);border-radius:8px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--purple-l);margin-bottom:6px;">🔄 ราคา↓ + OI↓ — Long Liquidation</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">แค่ Stop ล้าง ไม่ใช่เทรนด์ลงใหม่<br>→ รอ OI นิ่ง ค่อยหา Long entry</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- Tab: คู่มืออ่านค่า -->
+<div id="tab-guide" class="tab-page">
+<div class="guide-section">
+  <h2>📖 คู่มือ GBT Analysis</h2>
+  <p class="subtitle">อ่านค่า Dashboard ตั้งแต่ระดับพื้นฐานจนถึง Financial Engineering · ทุกสูตรใช้ Black-76 (r=0, Options on Futures)</p>
+
+  <!-- Part 1 -->
+  <div class="guide-part">
+    <h3>🎯 ส่วนที่ 1 — พื้นฐาน สำหรับผู้เริ่มต้น</h3>
+
+    <details class="accordion">
+      <summary>📍 ATM (At-The-Money) คืออะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-gold">ATM</span> คือ <strong>ราคา Strike ที่ใกล้เคียงกับราคา Futures ปัจจุบันมากที่สุด</strong> เช่น ถ้า Gold Futures อยู่ที่ 4,540 — Strike 4,540 คือ ATM</p>
+        <p>ใน dashboard นี้ <span class="hl-gold">Futures Price</span> = ราคา ATM ที่ดึงจากหัว CSV โดยตรง (บรรทัด "vs 4540.5")</p>
+        <div class="tip">💡 ATM คือจุดอ้างอิงหลัก — ราคาทุกอย่างวัดจากจุดนี้</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📍 DTE (Days to Expiry) คืออะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-gold">DTE</span> = จำนวนวันก่อนที่ Option จะหมดอายุ เช่น DTE 0.46 = เหลือเวลาไม่ถึงครึ่งวัน</p>
+        <p><strong>ผลต่อ Options:</strong></p>
+        <p>• DTE สูง → Premium มาก → Gamma ต่ำ (ราคาเปลี่ยนช้า)<br>• DTE ต่ำ → Premium น้อย → Gamma สูงมาก (ราคาเปลี่ยนเร็ว เสี่ยงสูง)</p>
+        <div class="warn">⚠️ เมื่อ DTE &lt; 1 วัน Gamma จะ spike สูงมาก — ราคา Options ผันผวนรุนแรง</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📍 IV — Implied Volatility (Vol Settle) คืออะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-gold">IV</span> คือ <strong>ความผันผวนที่ตลาดคาดการณ์ไว้ในราคา Option</strong> — ไม่ใช่ความผันผวนในอดีต แต่เป็นการมองไปข้างหน้า</p>
+        <p>ตัวเลขใน column <code>Vol Settle</code> ใน CSV เป็น <strong>decimal</strong> เช่น 0.1828 = 18.28%</p>
+        <p>ตัวเลขใน header2 "Vol: 17.83" เป็น <strong>เปอร์เซ็นต์</strong> โดยตรง</p>
+        <div class="formula">1σ Expected Range (Expiry) = F × σ × √(DTE/252)</div>
+        <p>ตัวอย่าง: F=4540, σ=18.28%, DTE=0.46 → Range = 4540 × 0.1828 × √(0.46/252) ≈ ±<strong>$25</strong></p>
+        <div class="tip">💡 IV สูง = ตลาดกังวล ค่า premium แพง / IV ต่ำ = ตลาดสงบ ค่า premium ถูก</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📍 Call / Put Volume และ Open Interest คืออะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-green">Call Volume</span> = จำนวน Contract ที่ซื้อขาย Call Option วันนี้ (Intraday)<br>
+        <span class="hl-red">Put Volume</span> = จำนวน Contract ที่ซื้อขาย Put Option วันนี้ (Intraday)</p>
+        <p><span class="hl-green">Call OI</span> = จำนวน Call Contract ที่ยัง open อยู่ทั้งหมด<br>
+        <span class="hl-red">Put OI</span> = จำนวน Put Contract ที่ยัง open อยู่ทั้งหมด</p>
+        <div class="tip">💡 Volume บอกว่าวันนี้ซื้อขายมากแค่ไหน / OI บอกว่ามีคนถือค้างไว้เท่าไหร่</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 2 -->
+  <div class="guide-part">
+    <h3>⚡ ส่วนที่ 2 — GEX (Gamma Exposure) หัวใจของ Dashboard</h3>
+
+    <details class="accordion">
+      <summary>🔬 GEX คืออะไร? และมาจากไหน?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-gold">GEX (Gamma Exposure)</span> คือ <strong>การวัดแรงกดดันของ Dealer (Market Maker) ต่อราคา</strong> ที่แต่ละ Strike</p>
+        <p>Dealer ขาย Option ให้นักลงทุน → Dealer ต้อง hedge ด้วย Futures → Gamma บอกว่าต้อง hedge เท่าไหร่เมื่อราคาเปลี่ยน</p>
+        <div class="formula">
+          Gamma (Black-76) = N'(d₁) / (F × σ × √T)<br><br>
+          d₁ = [ln(F/K) + ½σ²T] / (σ√T)<br><br>
+          Net GEX (per strike) = Gamma × (Call OI − Put OI) × F² × 100
+        </div>
+        <p>F = Futures price, K = Strike, T = DTE/365, σ = IV (decimal), N'(x) = Standard Normal PDF, 100 = oz per GC contract</p>
+        <div class="tip">💡 คิดง่ายๆ: GEX บอกว่า Dealer จะ "เหยียบเบรก" หรือ "เหยียบคันเร่ง" ตลาดที่แต่ละ Strike</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>🟢 GEX บวก vs 🔴 GEX ลบ — หมายความว่าอะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-green">GEX บวก (Call dominant)</span> — ที่ Strike นั้น Call OI > Put OI<br>
+        → Dealer Short Call → เมื่อราคาขึ้น Dealer ต้อง Sell Futures (เบรกการขึ้น)<br>
+        → เมื่อราคาลง Dealer ต้อง Buy Futures (เบรกการลง)<br>
+        ผล: <strong>ราคาถูกดูดกลับ → ตลาด Mean-Revert ในโซน +GEX</strong></p>
+
+        <p><span class="hl-red">GEX ลบ (Put dominant)</span> — ที่ Strike นั้น Put OI > Call OI<br>
+        → Dealer Short Put → เมื่อราคาลง Dealer ต้อง Sell Futures ด้วย (ยิ่งลง)<br>
+        → เมื่อราคาขึ้น Dealer ต้อง Buy Futures ด้วย (ยิ่งขึ้น)<br>
+        ผล: <strong>ราคาถูกดัน → ตลาด Trend ต่อในโซน -GEX</strong></p>
+
+        <div class="tip">💡 สรุป: โซน +GEX = ดูดราคา / โซน -GEX = ดันราคา</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>🎯 Call Wall, Put Wall, DGC Wall คืออะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-green">Call Wall (+Wall)</span> = Strike ที่มี GEX บวกสูงสุด → Dealer มีแรงกดดัน Sell Futures มากที่สุด → <strong>แนวต้านที่แข็งแกร่ง</strong></p>
+        <p><span class="hl-red">Put Wall (−Wall)</span> = Strike ที่มี GEX ลบมากที่สุด → Dealer มีแรงกดดัน Sell Futures มากเมื่อราคาลง → <strong>แนวรับที่แข็งแกร่ง</strong></p>
+        <p><span class="hl-gold">DGC Wall</span> = จุดกึ่งกลางระหว่าง Call Wall และ Put Wall</p>
+        <div class="formula">DGC Wall = (Call Wall Strike + Put Wall Strike) / 2</div>
+        <div class="tip">💡 DGC Wall = "จุดสมดุล" ของตลาด — ราคามักวนรอบจุดนี้ในวัน</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>⚡ Gamma Flip คืออะไร? ทำไมสำคัญมาก?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-gold">Gamma Flip</span> = จุดที่ Cumulative GEX เปลี่ยนเครื่องหมาย จาก + เป็น − (หรือกลับกัน)</p>
+        <p><strong>ความสำคัญ:</strong></p>
+        <p>• ราคา <strong>อยู่เหนือ Gamma Flip</strong> → Net GEX บวก → Dealer Long Gamma → <span class="hl-green">ตลาด Mean-Revert ความผันผวนต่ำ</span></p>
+        <p>• ราคา <strong>อยู่ต่ำกว่า Gamma Flip</strong> → Net GEX ลบ → Dealer Short Gamma → <span class="hl-red">ตลาด Trend ความผันผวนสูง</span></p>
+        <div class="warn">⚠️ เมื่อราคาหลุด Gamma Flip → มักเกิด momentum รุนแรง (เหมือน "ระเบิด Gamma Bomb")</div>
+        <div class="tip">💡 ใช้ Gamma Flip เป็น Key Level สำคัญ — อยู่เหนือ = ซื้อขายแบบ Range / ต่ำกว่า = ระวัง Trend</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 3 -->
+  <div class="guide-part">
+    <h3>📐 ส่วนที่ 3 — Expected Range (ช่วงราคาที่คาดการณ์)</h3>
+
+    <details class="accordion">
+      <summary>📏 1σ Range คืออะไร และใช้ยังไง?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-purple">1σ Expected Range</span> = ช่วงราคาที่มีโอกาส <strong>68.2%</strong> ที่ราคาจะอยู่ใน range นี้ก่อน Expiry</p>
+        <div class="formula">
+          1σ Range (Expiry) = F × σ_ATM × √(DTE / 252)<br>
+          1σ Range (1 Day)  = F × σ_ATM × √(1 / 252)
+        </div>
+        <p>ตัวอย่าง: F=4540, σ=18%, DTE=5<br>
+        1σ Exp = 4540 × 0.18 × √(5/252) = 4540 × 0.18 × 0.1409 ≈ <strong>±$115</strong><br>
+        ราคามีโอกาส 68% อยู่ระหว่าง 4,425–4,655 ก่อน Expiry</p>
+        <div class="tip">💡 ขาย Options ที่อยู่นอก 1σ มีโอกาสกำไรถึง 68% ตาม Theory (แต่ต้องดู GEX ประกอบด้วย)</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📊 2σ Range คืออะไร?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-purple">2σ Range</span> = ช่วงราคาที่มีโอกาส <strong>95.4%</strong> ที่ราคาจะอยู่ใน range นี้</p>
+        <div class="formula">2σ Range = 2 × (F × σ_ATM × √(DTE / 252))</div>
+        <div class="tip">💡 ราคาที่หลุด 2σ ถือว่า "ผิดปกติมาก" — มักเกิดจาก Event พิเศษ (Fed, War, Panic)</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>⚡ Composite GEX และ α Slider คืออะไร?</summary>
+      <div class="accordion-body">
+        <p>GBT ใช้ข้อมูล 2 แหล่ง: <span class="hl-blue">Intraday Volume</span> (ซื้อขายวันนี้) และ <span class="hl-green">Open Interest</span> (ถือค้างไว้)</p>
+        <p>ค่า α ช่วยผสมทั้งสอง:</p>
+        <div class="formula">
+          Composite GEX = (1 − α) × GEX_OI + α × GEX_Volume<br><br>
+          α = 0   → ใช้ OI 100% (structural, long-term)<br>
+          α = 0.4 → ผสม 60% OI + 40% Vol (recommended)<br>
+          α = 1   → ใช้ Volume 100% (intraday sentiment)
+        </div>
+        <div class="tip">💡 ค่า 0.4 ดีที่สุดในส่วนใหญ่ — เน้น structure ระยะยาวแต่รับ signal ล่าสุดด้วย</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 4 -->
+  <div class="guide-part">
+    <h3>📈 ส่วนที่ 4 — อ่านกราฟและสรุปสัญญาณ</h3>
+
+    <details class="accordion">
+      <summary>🗺️ อ่านกราฟ GEX อย่างไร?</summary>
+      <div class="accordion-body">
+        <p><strong>แนวตั้ง (ชนิดเส้น):</strong><br>
+        <span class="hl-gold">— ATM</span> เส้นทึบสีทอง = ราคา Futures ปัจจุบัน<br>
+        <span class="hl-green">+Wall</span> เส้นเขียว = Call Wall (แนวต้าน)<br>
+        <span class="hl-red">−Wall</span> เส้นแดง = Put Wall (แนวรับ)<br>
+        <span class="hl-gold">DGC Wall</span> เส้นทองประ = จุดสมดุล</p>
+
+        <p><strong>โซนสี (พื้นหลัง):</strong><br>
+        <span class="hl-purple">โซนม่วงเข้ม</span> = 1σ Expiry Range (68% โอกาส)<br>
+        <span class="hl-purple">โซนม่วงจาง</span> = 2σ Expiry Range (95% โอกาส)</p>
+
+        <div class="tip">
+          💡 สัญญาณซื้อ: ราคาอยู่เหนือ Gamma Flip + ใกล้ Put Wall + อยู่ใน 1σ Zone<br>
+          💡 สัญญาณขาย: ราคาอยู่ใกล้ Call Wall + GEX บวกสูงมาก + ราคาใกล้ขอบ 1σ
+        </div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>∑ อ่านกราฟ Cumulative GEX อย่างไร?</summary>
+      <div class="accordion-body">
+        <p>กราฟ Cumulative GEX แสดงการรวม GEX สะสมจากซ้ายไปขวา (จาก Strike ต่ำไปสูง)</p>
+        <p>• <strong>เส้นอยู่เหนือ 0</strong> = GEX รวมบวก → ราคาในโซนนั้นถูก "ดูด" กลับ<br>
+        • <strong>เส้นอยู่ต่ำกว่า 0</strong> = GEX รวมลบ → ราคาในโซนนั้นถูก "ดัน" ต่อ<br>
+        • <strong>จุดที่เส้นข้ามศูนย์</strong> = Gamma Flip → จุด key ที่สำคัญที่สุด</p>
+        <div class="tip">💡 ดูว่าราคาปัจจุบัน (ATM) อยู่ฝั่งไหนของ Gamma Flip — นั่นคือ "mode" ของตลาดวันนี้</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>🎯 สรุปกลยุทธ์การอ่านค่า GBT</summary>
+      <div class="accordion-body">
+        <p><strong>ขั้นตอนการอ่านค่าทุกเช้า:</strong></p>
+        <p><strong>1.</strong> ดู <span class="hl-gold">ATM vs Gamma Flip</span> — อยู่เหนือ Flip = Range mode / ต่ำกว่า = Trend mode</p>
+        <p><strong>2.</strong> ดู <span class="hl-blue">1σ Range</span> — นี่คือ "สนามเด็กเล่น" ของราคาวันนี้</p>
+        <p><strong>3.</strong> ดู <span class="hl-green">Call Wall</span> และ <span class="hl-red">Put Wall</span> — แนวต้าน/แนวรับหลัก</p>
+        <p><strong>4.</strong> ดู <span class="hl-gold">DGC Wall</span> — ถ้าราคาวนรอบนี้ = ตลาดไม่มี Direction</p>
+        <p><strong>5.</strong> ดู <span class="hl-blue">Net GEX รวม</span> — บวกมาก = ตลาดนิ่ง / ลบมาก = ระวัง</p>
+        <div class="tip">📌 GBT เป็นเครื่องมือ Flow Analysis — ใช้ประกอบกับ Price Action และ Macro Context เสมอ</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 5: Today's Edge — Zone Decision Engine -->
+  <div class="guide-part">
+    <h3>🎯 ส่วนที่ 5 — Today's Edge (Zone Decision Engine)</h3>
+
+    <details class="accordion" open>
+      <summary>🎯 Panel นี้ทำงานยังไง?</summary>
+      <div class="accordion-body">
+        <p><strong>Today's Edge</strong> เป็น panel เด่นบนสุดของ tab GEX และ Cumulative ทำหน้าที่<strong>สรุป signal ทั้งหมด</strong>ในจอเดียวเพื่อบอกว่า <span class="hl-gold">วันนี้ควรเทรดโซนไหน</span></p>
+        <p><strong>ส่วนประกอบ (ซ้าย → ขวา):</strong></p>
+        <p>
+          • <span class="hl-gold">Verdict</span> — <strong>LEAN/STRONG LONG</strong> (เขียว), <strong>LEAN/STRONG SHORT</strong> (แดง), หรือ <strong>NO TRADE / WAIT</strong> (เทา) พร้อม Confidence 0-100<br>
+          • <span class="hl-gold">Trade Plan</span> — Entry range, Stop, Target พร้อม R:R และจำนวน lot ตาม Risk ที่ตั้งไว้ที่ Zone Planner<br>
+          • <span class="hl-gold">Signal Breakdown</span> — 6 เหตุผลหลักที่ engine ใช้ตัดสิน (✓ บวก / ✗ ลบ / ⚠ เตือน) พร้อมคะแนน ±N<br>
+          • <span class="hl-gold">Meta chips</span> — GEX sign, Regime, Gap bucket, σ-D triggers, Vol-OI Quadrant, Daily EM, VRP
+        </p>
+        <div class="formula">
+          Confidence = max(scoreLong, scoreShort)  ·  Verdict = Long ถ้า scoreLong − scoreShort > 8<br>
+          ถ้า winnerScore &lt; 18 หรือ |margin| &lt; 8 → NO TRADE
+        </div>
+        <div class="tip">💡 ภาพรวมการอ่าน: <strong>Verdict สีเขียว/แดงเข้ม + confidence &gt; 50</strong> = signal แรง / <strong>NO TRADE</strong> = อย่าฝืน รอราคาทะลุ ±1σ Trigger ก่อน</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>🧮 สูตร Scoring ที่ engine ใช้</summary>
+      <div class="accordion-body">
+        <p>คะแนนแต่ละด้าน (Long/Short) สะสมจาก signal ต่อไปนี้:</p>
+        <p><strong>ตำแหน่งราคา vs Open (กฎ Mtraders SD):</strong><br>
+          • |sdPos| &lt; 1σ → <span class="hl-red">−10</span> ทั้งสองฝั่ง (No-Trade Zone)<br>
+          • 1σ ≤ |sdPos| &lt; 2σ → <span class="hl-green">+18</span> ฝั่งตรงข้าม (Action Zone)<br>
+          • |sdPos| ≥ 2σ → <span class="hl-green">+22</span> ฝั่งตรงข้าม (Extreme Zone)
+        </p>
+        <p><strong>Gap Fill Bucket (จาก 1,948 sessions):</strong><br>
+          • &lt; $5 → +18 (97.6% fill)<br>
+          • $5-10 → +14<br>
+          • $10-20 → +10<br>
+          • $20-30 → +8<br>
+          • $30-50 → −5<br>
+          • &gt; $50 → <span class="hl-red">−18</span> (no edge)
+        </p>
+        <p><strong>Total GEX:</strong> บวก = +14 ทั้งสองฝั่ง (Mean-Revert), ลบ = −12 (Trending — ระวัง)</p>
+        <p><strong>Wall proximity:</strong> ใกล้ Put Wall (Long edge) หรือ Call Wall (Short edge) ภายใน 1.5σ-D → +14</p>
+        <p><strong>Gamma Flip:</strong> เหนือ Flip↑ → +8 / ต่ำกว่า Flip↓ → −10</p>
+        <p><strong>Vanna risk (Gold-specific):</strong> Spot↑+IV↑ → Short edge −15 (squeeze fuel) / Spot↓+IV↑ → Long edge −12 (panic hedging)</p>
+        <p><strong>Regime:</strong> Mid +5 / Extreme −8</p>
+        <p><strong>Friday/late session:</strong> −5 (Charm unwind risk)</p>
+        <div class="warn">⚠ score ทุกตัวยอด overshoot ไม่เกิน 100 — ใช้เป็น <strong>confidence indicator</strong> ไม่ใช่ probability จริง</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📊 Call/Put Change vs Previous Snapshot ใช้ยังไง?</summary>
+      <div class="accordion-body">
+        <p>การ์ดนี้แสดงผลต่างของ <strong>Call OI / Put OI</strong> ระหว่าง snapshot ปัจจุบันกับ snapshot ก่อนหน้า (ส่วนใหญ่ห่างประมาณ 30 นาที)</p>
+        <p><strong>อ่านอย่างไร:</strong></p>
+        <p>
+          • <span class="hl-green">ΔCall Total +ve</span> = มีการเปิดสถานะ Call ใหม่เพิ่มเข้ามา (ตลาดเริ่มเก็งฝั่งขาขึ้น)<br>
+          • <span class="hl-red">ΔPut Total +ve</span> = มีการเปิดสถานะ Put ใหม่ (กลัวลงหรือ hedge)<br>
+          • <strong>ΔCall &gt;&gt; ΔPut</strong> → 📈 <span class="hl-green">Call Build (Bullish flow)</span><br>
+          • <strong>ΔPut &gt;&gt; ΔCall</strong> → 📉 <span class="hl-red">Put Build (Bearish flow)</span><br>
+          • ทั้งสองลง → ⬇ Unwind (ปิดสถานะก่อนเหตุการณ์ /ใกล้หมดอายุ)
+        </p>
+        <p><strong>Top Build-up (สีเขียว):</strong> Strike ที่ <strong>OI/Volume เพิ่มมากที่สุด</strong> — มัก<em>เป็นโซน "ใหม่"</em>ที่สถาบันกำลังกองเงินไว้ — ราคามักวิ่งไปทดสอบโซนนี้</p>
+        <p><strong>Top Unwind (สีแดง):</strong> Strike ที่ <strong>OI ลดมากที่สุด</strong> — โซนเก่าที่ถูกทิ้ง อาจเป็นสัญญาณ exit</p>
+        <div class="tip">💡 ใช้ confirm กับ Today's Edge: ถ้า Edge บอก SHORT และเห็น ΔPut เพิ่มที่โซนสูง = <strong>Confluence แรง</strong></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 6: Block Strategy -->
+  <div class="guide-part">
+    <h3>🎰 ส่วนที่ 6 — Block Strategy ($25 / $50 / $100)</h3>
+
+    <details class="accordion" open>
+      <summary>🎰 ทำไมต้องเล่นที่ Block $25 / $50 / $100?</summary>
+      <div class="accordion-body">
+        <p>จากข้อมูล Vol2Vol — <strong>Strike ที่ราคาลงท้ายด้วยตัวเลขกลม ($25, $50, $100)</strong> มี OI และ Volume กระจุกหนักอย่างมีนัยสำคัญ — เกิดจาก <em>Round-Number Bias</em> ของนักลงทุน (ทั้ง retail และ institutional ชอบเปิดสถานะที่ราคากลม)</p>
+        <p>สิ่งนี้สร้าง <strong>กำแพง Gamma</strong> ที่:</p>
+        <p>• ราคาเข้าใกล้ → Market Maker hedge หนักขึ้น → <span class="hl-green">เด้งกลับชัด (mean revert)</span></p>
+        <p>• ราคาทะลุได้ → ทะลุแรง <span class="hl-red">(Squeeze / Cascading)</span> ไปหา Block ถัดไป</p>
+        <p>นี่คือเหตุผลที่ <span class="hl-gold">Median Daily Range ของทอง = $25.6</span> ตรงกับ $25 Strike Interval ของ CME แบบเป๊ะๆ</p>
+        <div class="tip">💡 เรา <strong>ไม่ต้องทำนายทิศทาง</strong> แค่รอราคาเข้าใกล้ Block แล้วเทรดเด้ง/ทะลุตาม signal</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📏 เลือก Block ขนาดไหนตามความผันผวน?</summary>
+      <div class="accordion-body">
+        <p>ใช้ <strong>1σ-Day</strong> (แสดงใน Today's Edge meta chip) เป็นตัวกำหนด:</p>
+        <table class="zp-table">
+          <thead><tr><th>1σ-Day</th><th>Block หลัก</th><th>Block รอง</th><th>วันแบบไหน</th></tr></thead>
+          <tbody>
+            <tr><td>&lt; $30</td><td>🟢 <strong>$25</strong></td><td>—</td><td>Low Vol — ตลาดซึม</td></tr>
+            <tr><td>$30 — $60</td><td>🟡 <strong>$50</strong></td><td>$25</td><td>Mid Vol — มาตรฐาน</td></tr>
+            <tr><td>&gt; $60</td><td>🔴 <strong>$100</strong></td><td>$50</td><td>High/Extreme — ข่าวใหญ่</td></tr>
+          </tbody>
+        </table>
+        <p>Pill ใน Block Strategy card จะ <strong>highlight</strong> Block แนะนำตามค่า 1σ-D ของ snapshot ปัจจุบันให้อัตโนมัติ</p>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📋 3 Setup เทรด (SL/TP)</summary>
+      <div class="accordion-body">
+        <p><strong>Setup 1 — Pure Block (1:1)</strong></p>
+        <p>SL <span class="hl-red">$12.5</span> · TP <span class="hl-green">$12.5</span> · R:R 1:1<br>
+        ใช้คู่กับ <strong>Recovery flip</strong> — ถ้า SL → กลับทางทันที</p>
+
+        <p><strong>Setup 2 — Extended Block (1:2)</strong></p>
+        <p>SL $12.5 · TP $25 · R:R 1:2<br>
+        เหมาะกับ Low/Mid Vol — Win 1 ครั้งคุ้ม Loss 2 ครั้ง</p>
+
+        <p><strong>Setup 3 — Big Block (High Vol)</strong></p>
+        <p>SL $25 · TP $50 · R:R 1:2<br>
+        ใช้เมื่อ 1σ-D &gt; $50 — ลด size ตาม regime</p>
+        <div class="warn">⚠ ทั้ง 3 setup ต้องเทรดที่ <strong>โซน Block + signal Today's Edge สนับสนุน</strong> ไม่ใช่เทรดดื้อๆ ที่กลางช่วง</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 7: Recovery Trade -->
+  <div class="guide-part">
+    <h3>🔄 ส่วนที่ 7 — Recovery Trade (Flip + Lot Increase)</h3>
+
+    <details class="accordion" open>
+      <summary>🔄 หลักการ Recovery: Flip ทาง + เพิ่ม Lot</summary>
+      <div class="accordion-body">
+        <p>เมื่อ SL ที่ <strong>ครึ่ง block</strong> ($12.5) — ราคามัก<em>เด้งกลับทางเดิมในวันเดียวกัน</em>ตามสถิติ Intraday Reversion 54.7% (สูงถึง 64.4% ถ้า gap &gt; $15) เราใช้กลไกนี้กลับมาเก็บ block แทน</p>
+        <p><strong>ตัวอย่าง flow (SL=TP=$12.5):</strong></p>
+        <p>
+          1. <strong>Buy 0.10 lot</strong> ที่ $4,540 → SL $4,527.5 → ขาดทุน <span class="hl-red">$125</span><br>
+          2. <strong>Flip — Sell 0.20 lot</strong> (เพิ่มเป็น 2 เท่า) ที่ $4,527.5 → TP $4,515 → กำไร <span class="hl-green">$250</span><br>
+          3. Net = +$250 − $125 = <span class="hl-green">+$125</span> (= 1 block profit)
+        </p>
+        <p>ถ้าครั้งที่ 2 ก็โดน SL อีก:</p>
+        <p>
+          • Cum loss = $125 + $250 = $375<br>
+          • <strong>Trade #3 — Buy 0.40 lot</strong> → TP $12.5 = <span class="hl-green">$500</span><br>
+          • Net = $500 − $375 = +$125 ✓
+        </p>
+        <div class="formula">
+          Next Lot = (Cumulative Loss + Target Profit) ÷ (TP × $100)<br>
+          ที่ Setup 1:1 → Lot จะโตเป็น <strong>1, 2, 4, 8, 16…</strong> (เหมือน Martingale)
+        </div>
+        <div class="warn">⚠ <strong>คำเตือนสำคัญ:</strong> Recovery 1:1 ใช้ <strong>Martingale</strong> ซึ่ง lot โตทวีคูณ — ถ้าพบ Gap หรือ Fat-tail event 1 ครั้งอาจล้างพอร์ตได้ <strong>ต้องตั้ง max sequence ≤ 5-6 ครั้ง</strong> แล้วยอม cut loss</div>
+        <div class="tip">💡 Setup 1:2 (SL $12.5 / TP $25) ปลอดภัยกว่ามาก เพราะ <strong>lot ไม่ต้องเพิ่มเร็ว</strong> (รอบแรก 0.10 → รอบ 2 = 0.10 พอ, รอบ 3 = 0.15)</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>🧮 ใช้ Recovery Lot Calculator (ใน Zone Planner)</summary>
+      <div class="accordion-body">
+        <p>ปรับ Initial Lot, SL, TP, Max sequence → ตารางจะคำนวณให้:</p>
+        <p>
+          • <strong>Lot</strong> ที่ต้องใช้ในแต่ละ trade<br>
+          • <strong>If TP</strong> = Net profit (รวม recover loss แล้ว)<br>
+          • <strong>If SL</strong> = Cumulative Loss ที่ต้องแบกถ้าทุกไม้แพ้<br>
+          • <strong>Margin</strong> = หลักประกันรวมโดยประมาณ (สมมติ $10,000/lot)
+        </p>
+        <p><strong>วิธีตั้ง Max sequence:</strong> ดู Worst-case Loss ใน summary — ถ้ามากกว่า 20-30% ของพอร์ต <strong>อย่าใช้ sequence ยาวกว่านั้น</strong></p>
+        <div class="tip">💡 <strong>กฎทอง:</strong> ก่อนเริ่ม Recovery ในแต่ละวันให้ตั้งเป้า <strong>"จบที่ trade ที่เท่าไหร่ถ้ายังแพ้"</strong> เช่น 4 แล้วยอมรับ loss — ไม่ว่ายังไงก็ตาม</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 8: Multi-device access / Deployment -->
+  <div class="guide-part">
+    <h3>📱 ส่วนที่ 8 — เปิดใช้งานจากมือถือ / เครื่องอื่น</h3>
+
+    <details class="accordion" open>
+      <summary>🌐 วิธีเปิดดู Dashboard นี้จากที่ไหนก็ได้ (GitHub Pages — ฟรี)</summary>
+      <div class="accordion-body">
+        <p><strong>วิธีง่ายที่สุด:</strong> Push ไฟล์ <code>gbt_dashboard.html</code> ขึ้น GitHub แล้วเปิด GitHub Pages — ได้ URL เปิดผ่านมือถือ/คอม/iPad ที่ไหนก็ได้</p>
+
+        <p><strong>ขั้นตอน (ครั้งเดียว):</strong></p>
+        <p>
+          1. ไปที่ <a href="https://github.com/new" target="_blank" style="color:var(--blue-l);">github.com/new</a> สร้าง repo ใหม่ ชื่อเช่น <code>gbt-dashboard</code> (Public หรือ Private ก็ได้)<br>
+          2. Upload <code>gbt_dashboard.html</code> โดย rename เป็น <code>index.html</code> ก่อน (เพื่อให้ Pages เปิดอัตโนมัติ) — หรือเก็บชื่อเดิมไว้ก็ได้<br>
+          3. ไปที่ <strong>Settings → Pages</strong> ของ repo<br>
+          4. ที่ "Source" เลือก <strong>Deploy from a branch</strong> → Branch <strong>main</strong> → Folder <strong>/ (root)</strong> → กด Save<br>
+          5. รอ 1-2 นาที จะได้ URL: <code>https://&lt;username&gt;.github.io/gbt-dashboard/</code>
+        </p>
+
+        <p><strong>การใช้งานจากมือถือ:</strong></p>
+        <p>
+          • เปิด URL บน Safari/Chrome → กด "Add to Home Screen" → ใช้เหมือนแอป<br>
+          • Dashboard ปรับ layout ให้เหมาะกับจอเล็กแล้ว (responsive)<br>
+          • Setup ครั้งแรก: ใส่ GitHub Token (ไม่บังคับ — ใช้ใน-memory ไม่บันทึก)
+        </p>
+
+        <p><strong>ทำไมต้อง GitHub Pages (ไม่ใช่ OneDrive/Google Drive):</strong></p>
+        <p>เพราะ Dashboard เป็น HTML + JS ที่ต้องรันใน browser — <strong>OneDrive/GDrive แสดงเป็นไฟล์ดิบเฉยๆ ไม่รัน JS</strong> ส่วน GitHub Pages serve HTML ให้ browser render ได้เต็มที่ + ฟรี + HTTPS</p>
+
+        <div class="warn">⚠ <strong>Private repo:</strong> ถ้า repo เป็น private ต้องอัปเกรด GitHub Plan (Pro/Team) ถึงจะใช้ Pages ได้ — แต่ Public ฟรีไม่จำกัด</div>
+        <div class="tip">💡 ทุกครั้งที่แก้ไข dashboard บนเครื่อง → push ขึ้น repo → URL update อัตโนมัติภายใน 1-2 นาที</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>🔑 GitHub Token (PAT) — ตั้งครั้งเดียว ใช้ทุกเครื่อง</summary>
+      <div class="accordion-body">
+        <p>โดยปกติ GitHub API ให้ <strong>60 requests/hour</strong> สำหรับ anonymous — Dashboard เรียก ~10-20 req/refresh, ทุก 5 นาที = พอใช้แต่ตึง</p>
+        <p>ใส่ <strong>Personal Access Token (PAT)</strong> → เพิ่มเป็น <strong>5,000/hour</strong></p>
+        <p><strong>วิธีสร้าง PAT:</strong></p>
+        <p>
+          1. ไปที่ <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--blue-l);">github.com/settings/tokens/new</a><br>
+          2. ตั้งชื่อ เช่น "GBT Dashboard"<br>
+          3. <strong>Scope:</strong> ถ้า repo ข้อมูลเป็น Public → ไม่ต้องเลือก scope (รัน scope-less ได้)<br>
+          4. กด Generate → คัดลอกค่า <code>ghp_...</code><br>
+          5. ใส่ในช่อง Token ตอนเปิด Dashboard (กด ⚙ Settings)
+        </p>
+        <div class="warn">⚠ Token เก็บใน <strong>memory ของ browser เท่านั้น</strong> — รีเฟรชหน้าจะหายต้องใส่ใหม่ (ออกแบบเพื่อความปลอดภัย)</div>
+        <div class="tip">💡 อยากให้ token อยู่ถาวร? แก้ใน <code>startDashboard()</code> ให้บันทึกใน <code>localStorage</code> — แต่ระวังถ้าใช้คอมร่วมกัน</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📲 Mobile Layout — ปรับใหม่อย่างไร?</summary>
+      <div class="accordion-body">
+        <p>เพิ่ม CSS media query ให้ระหว่างจอ ≤ 900px และ ≤ 560px:</p>
+        <p>
+          • <strong>Metrics row</strong>: 9 ช่อง → 2 ช่อง/แถว<br>
+          • <strong>Today's Edge</strong>: 3 columns → 1 column (verdict ขึ้นบน, plan กลาง, reasons ล่าง)<br>
+          • <strong>Zone Planner</strong>: input panel กับ output stack กัน, sizer grid 2x2<br>
+          • <strong>Chart height</strong>: ลดเหลือ 260px<br>
+          • <strong>Tabs</strong>: scroll แนวนอนได้
+        </p>
+        <div class="tip">💡 ทดสอบบนมือถือก่อนใช้จริง — บางส่วนอาจต้อง pinch-zoom เช่น GEX chart แท่งเล็กๆ</div>
+      </div>
+    </details>
+  </div>
+</div>
+</div><!-- end tab-guide -->
+
+<script>
+// ── State ──────────────────────────────────────────────
+let GH_TOKEN='', DATA_REPO='pageth/Vol2VolData';
+let currentMode='intraday', alpha=0.40;
+let commits={intraday:[],oi:[]};
+let parsedData={intraday:null,oi:null};
+let previousData={intraday:null,oi:null};   // snapshot BEFORE the currently loaded one
+let previousMeta={intraday:null,oi:null};   // {sha, date} of previous snapshot
+let currentMeta={intraday:null,oi:null};    // {sha, date} of current snapshot
+let gexChart=null, cumChart=null;
+let currentTab='gex';
+let sessionIVs=[];  // collect ATM IV across snapshots for IV Rank
+
+// ── Tab switching ──────────────────────────────────────
+function switchTab(tab) {
+  currentTab=tab;
+  document.querySelectorAll('.main-tab').forEach((b,i)=>{
+    const tabs=['gex','cumulative','deltarange','guide'];
+    b.classList.toggle('active',tabs[i]===tab);
+  });
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  const hideControls=tab==='guide'||tab==='deltarange';
+  document.getElementById('chart-controls').style.display=hideControls?'none':'block';
+  if(tab==='cumulative'&&parsedData[currentMode]) renderCumulative();
+}
+
+// ── Setup ──────────────────────────────────────────────
+async function startDashboard() {
+  const token=document.getElementById('token-input').value.trim();
+  const repo=document.getElementById('repo-input').value.trim();
+  if(!repo){alert('กรุณาใส่ชื่อ repo');return;}
+  const btn=document.querySelector('.btn-primary');
+  btn.textContent='Connecting…';btn.disabled=true;
+  document.getElementById('setup-error').style.display='none';
+  try {
+    const h={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+    if(token) h['Authorization']=`Bearer ${token}`;
+    const r=await fetch(`https://api.github.com/repos/${repo}`,{headers:h});
+    if(r.status===401) throw new Error('Token ไม่ถูกต้องหรือหมดอายุ');
+    if(r.status===403) throw new Error('Token ไม่มีสิทธิ์ ต้องการ scope "repo" สำหรับ private repo');
+    if(r.status===404) throw new Error(`ไม่พบ repo "${repo}"`);
+    if(!r.ok) throw new Error(`GitHub API error ${r.status}`);
+  } catch(e) {
+    const el=document.getElementById('setup-error');
+    el.textContent='⚠ '+e.message;el.style.display='block';
+    btn.textContent='Load Dashboard →';btn.disabled=false;return;
+  }
+  GH_TOKEN=token;DATA_REPO=repo;
+  document.getElementById('setup-overlay').style.display='none';
+  btn.textContent='Load Dashboard →';btn.disabled=false;
+  init();
+}
+function showSetup(){document.getElementById('setup-overlay').style.display='flex';}
+
+// ── GitHub API ─────────────────────────────────────────
+async function ghFetch(path) {
+  const h={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  if(GH_TOKEN) h['Authorization']=`Bearer ${GH_TOKEN}`;
+  const r=await fetch(`https://api.github.com/repos/${DATA_REPO}/${path}`,{headers:h});
+  if(!r.ok) throw new Error(`GitHub API ${r.status}: ${r.statusText}`);
+  return r.json();
+}
+async function fetchCommits(file,n=60){return ghFetch(`commits?path=${file}&per_page=${n}`);}
+async function fetchFileAtCommit(file,sha){
+  const d=await ghFetch(`contents/${file}?ref=${sha}`);
+  return atob(d.content.replace(/\n/g,''));
+}
+
+// ── Bangkok helpers ────────────────────────────────────
+const BKK='Asia/Bangkok';
+function nowBKK(){return new Date(new Date().toLocaleString('en-US',{timeZone:BKK}));}
+function sessionDate(){const d=nowBKK();if(d.getHours()<10)d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];}
+function filterToday(list){
+  const today=sessionDate();
+  const t=list.filter(c=>{const d=new Date(c.commit.author.date);return new Date(d.toLocaleString('en-US',{timeZone:BKK})).toISOString().split('T')[0]===today;});
+  return t.length?t:list.slice(0,5);
+}
+function fmtTimeBKK(ds){return new Date(ds).toLocaleTimeString('en-US',{timeZone:BKK,hour:'2-digit',minute:'2-digit',hour12:false});}
+function updateClock(){const b=nowBKK();document.getElementById('bkk-time').textContent=`BKK ${String(b.getHours()).padStart(2,'0')}:${String(b.getMinutes()).padStart(2,'0')}`;}
+
+// ── CSV Parser ─────────────────────────────────────────
+function parseGBT(raw) {
+  const lines=raw.replace(/\r/g,'').split('\n');
+  if(lines.length<3) throw new Error('CSV too short');
+  const h1=lines[0], h2=lines[1];
+  const mp=h1.match(/vs\s+([\d,.]+)/);
+  const md=h1.match(/\(([\d.]+)\s*DTE\)/)||h1.match(/([\d.]+)\s*DTE/);
+  const mfc=h1.match(/\(([+-]?[\d.]+)\)\s*-/)||h1.match(/\(([+-]?[\d.]+)\)$/);
+  const futuresPrice=mp?parseFloat(mp[1].replace(/,/g,'')):null;
+  const dte=md?parseFloat(md[1]):null;
+  const futChg=mfc?parseFloat(mfc[1]):0;
+  const mput=h2.match(/Put:\s*([\d,]+)/);
+  const mcall=h2.match(/Call:\s*([\d,]+)/);
+  const mvol=h2.match(/(?<!Chg\s)\bVol:\s*([\d.]+)/);
+  const mchg=h2.match(/Vol Chg:\s*([+-]?[\d.]+)/);
+  const putTotal=mput?parseInt(mput[1].replace(/,/g,'')):0;
+  const callTotal=mcall?parseInt(mcall[1].replace(/,/g,'')):0;
+  const atmIV=mvol?parseFloat(mvol[1]):0;  // in %
+  const ivChg=mchg?parseFloat(mchg[1]):0;
+  const rows=[];
+  for(let i=2;i<lines.length;i++){
+    const p=lines[i].trim().split(',');
+    if(p.length<4)continue;
+    const s=parseInt(p[0]);
+    if(isNaN(s)||s<100)continue;
+    rows.push({strike:s,call:parseFloat(p[1])||0,put:parseFloat(p[2])||0,volSettle:parseFloat(p[3])||0});
+  }
+  rows.sort((a,b)=>a.strike-b.strike);
+  const openPrice=futuresPrice!=null?futuresPrice-futChg:null;
+  return{futuresPrice,openPrice,dte,futChg,putTotal,callTotal,atmIV,ivChg,rows};
+}
+
+// ── Black-76 Gamma ─────────────────────────────────────
+function npdf(x){return Math.exp(-.5*x*x)/Math.sqrt(2*Math.PI);}
+function b76gamma(F,K,T,sig){
+  if(T<=0||sig<=0||F<=0||K<=0)return 0;
+  const sq=Math.sqrt(T),d1=(Math.log(F/K)+.5*sig*sig*T)/(sig*sq);
+  return npdf(d1)/(F*sig*sq);
+}
+const GC=100;
+function calcGEX(parsed){
+  const{futuresPrice:F,dte,rows,atmIV}=parsed;
+  if(!F||!dte)return{rows:rows.map(r=>({...r,gex:0})),totalGex:0};
+  const T=dte/365;
+  let total=0;
+  const res=rows.map(r=>{
+    const sig=r.volSettle>0?r.volSettle:(atmIV/100);
+    const g=b76gamma(F,r.strike,T,sig);
+    const gex=g*(r.call-r.put)*F*F*GC;
+    total+=gex;
+    return{...r,gex};
+  });
+  return{rows:res,totalGex:total};
+}
+
+// ── Composite GEX ──────────────────────────────────────
+function mergeComposite(oiParsed,volParsed,a){
+  if(!oiParsed||!volParsed)return oiParsed||volParsed;
+  const oiGex=calcGEX(oiParsed);
+  const volGex=calcGEX(volParsed);
+  const strikeMap={};
+  oiGex.rows.forEach(r=>strikeMap[r.strike]={...r,gex_oi:r.gex,gex_vol:0});
+  volGex.rows.forEach(r=>{
+    if(strikeMap[r.strike])strikeMap[r.strike].gex_vol=r.gex;
+    else strikeMap[r.strike]={...r,gex_oi:0,gex_vol:r.gex};
+  });
+  const merged=Object.values(strikeMap).sort((a,b)=>a.strike-b.strike);
+  merged.forEach(r=>r.gex=(1-a)*r.gex_oi+a*r.gex_vol);
+  const totalGex=merged.reduce((s,r)=>s+r.gex,0);
+  return{
+    ...volParsed,
+    futuresPrice:volParsed.futuresPrice||oiParsed.futuresPrice,
+    openPrice:volParsed.openPrice||oiParsed.openPrice,
+    rows:merged,totalGex
+  };
+}
+
+// ── Key Levels ─────────────────────────────────────────
+function calcLevels(rows,F){
+  const callWall=rows.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null});
+  const putWall=rows.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null});
+  const above=rows.filter(r=>r.strike>=F),below=rows.filter(r=>r.strike<F);
+  let flipAbove=null,flipBelow=null;
+  for(let i=0;i<above.length-1;i++)if(above[i].gex*above[i+1].gex<=0){flipAbove=above[i];break;}
+  for(let i=below.length-1;i>0;i--)if(below[i].gex*below[i-1].gex<=0){flipBelow=below[i];break;}
+  const dgcWall=callWall.strike&&putWall.strike?(callWall.strike+putWall.strike)/2:null;
+  return{callWall,putWall,flipAbove,flipBelow,dgcWall};
+}
+
+// ── Expected Range ─────────────────────────────────────
+function calcRange(F,sigma_pct,dte){
+  const sig=sigma_pct/100;
+  const r1exp=F*sig*Math.sqrt(dte/252);
+  const r2exp=2*r1exp;
+  const r1day=F*sig*Math.sqrt(1/252);
+  return{r1exp,r2exp,r1day,lo1:F-r1exp,hi1:F+r1exp,lo2:F-r2exp,hi2:F+r2exp,lo1d:F-r1day,hi1d:F+r1day};
+}
+
+// ── Update Metrics ─────────────────────────────────────
+function updateMetrics(parsed,totalGex){
+  const{futuresPrice:F,dte,atmIV,ivChg,putTotal,callTotal,futChg}=parsed;
+  document.getElementById('m-price').textContent=F?`$${F.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`:'—';
+  document.getElementById('m-price-chg').textContent=`Future Chg: ${futChg>=0?'+':''}${futChg.toFixed(2)}`;
+  document.getElementById('m-iv').textContent=atmIV?`${atmIV.toFixed(2)}%`:'—';
+  const chgEl=document.getElementById('m-iv-chg');
+  chgEl.textContent=`Vol Chg: ${ivChg>=0?'+':''}${ivChg.toFixed(2)}%`;
+  chgEl.style.color=ivChg>0?'var(--red-l)':ivChg<0?'var(--green-l)':'var(--muted)';
+  document.getElementById('m-dte').textContent=dte!=null?dte.toFixed(2):'—';
+  const pc=callTotal>0?(putTotal/callTotal).toFixed(2):'—';
+  const pcEl=document.getElementById('m-pc');
+  pcEl.textContent=pc;
+  pcEl.className=`metric-value ${parseFloat(pc)>1?'val-red':'val-green'}`;
+  document.getElementById('m-pc-sub').textContent=`Put: ${putTotal.toLocaleString()}  Call: ${callTotal.toLocaleString()}`;
+  const gM=totalGex/1e6;
+  document.getElementById('m-gex').textContent=`${gM>=0?'+':''}${gM.toFixed(1)}M`;
+  document.getElementById('m-gex').className=`metric-value ${gM>=0?'val-green':'val-red'}`;
+  document.getElementById('m-gex-bias').textContent=gM>0?'Long Gamma — ตลาด Mean-Revert':'Short Gamma — ระวัง Trending';
+
+  const{openPrice}=parsed;
+  const Fopen=openPrice||F;
+  if(Fopen&&atmIV&&dte){
+    const rng=calcRange(Fopen,atmIV,dte);
+    document.getElementById('m-r16exp').textContent=`±$${rng.r1exp.toFixed(2)}`;
+    document.getElementById('m-r16exp-range').textContent=`${rng.lo1.toFixed(2)} — ${rng.hi1.toFixed(2)}`;
+    document.getElementById('m-r16day').textContent=`±$${rng.r1day.toFixed(2)}`;
+    document.getElementById('m-r16day-range').textContent=`${rng.lo1d.toFixed(2)} — ${rng.hi1d.toFixed(2)}`;
+    document.getElementById('rb-1exp').textContent=`${rng.lo1.toFixed(2)}–${rng.hi1.toFixed(2)}`;
+    document.getElementById('rb-2exp').textContent=`${rng.lo2.toFixed(2)}–${rng.hi2.toFixed(2)}`;
+    document.getElementById('rb-1day').textContent=`${rng.lo1d.toFixed(2)}–${rng.hi1d.toFixed(2)}`;
+    const openEl=document.getElementById('rb-open-label');
+    if(openEl)openEl.textContent=`Open: $${Fopen.toFixed(2)}`;
+  }
+}
+function updateLevels(lv,F){
+  const{callWall,putWall,flipAbove,flipBelow,dgcWall}=lv;
+  document.getElementById('rb-dgc').textContent=dgcWall?`$${dgcWall.toFixed(2)}`:'—';
+  document.getElementById('rb-cwall').textContent=callWall.strike?`$${callWall.strike}`:'—';
+  document.getElementById('rb-pwall').textContent=putWall.strike?`$${putWall.strike}`:'—';
+  const c=(label,strike,sub,cls)=>`<div class="level-card"><div class="level-label">${label}</div><div class="level-value ${cls}">${strike!=null?`$${typeof strike==='number'?strike.toLocaleString():strike}`:'—'}</div><div class="level-sub">${sub}</div></div>`;
+  document.getElementById('levels-grid').innerHTML=[
+    c('ATM / Futures',F?Math.round(F):null,'Current spot',  'val-gold'),
+    c('Call Wall (+Wall)',callWall.strike,'Resistance — Dealer Sell Futures','val-green'),
+    c('Put Wall (−Wall)',putWall.strike,'Support — Dealer Sell Futures on drop','val-red'),
+    c('DGC Wall (midpoint)',dgcWall?Math.round(dgcWall):null,'(Call Wall + Put Wall) / 2','val-gold'),
+    c('Gamma Flip ↑',flipAbove?.strike??null,'Zero GEX above ATM','val-blue'),
+    c('Gamma Flip ↓',flipBelow?.strike??null,'Zero GEX below ATM','val-blue'),
+  ].join('');
+}
+
+// ── GEX Chart ──────────────────────────────────────────
+function renderGEX(parsed,gexRows,totalGex){
+  const{futuresPrice:F,openPrice,dte,atmIV}=parsed;
+  const Fopen=openPrice||F;
+  const labels=gexRows.map(r=>r.strike);
+  const vals=gexRows.map(r=>r.gex/1e6);
+  const colors=vals.map(v=>v>=0?'rgba(46,160,67,.75)':'rgba(218,54,51,.75)');
+  const borders=vals.map(v=>v>=0?'#2ea043':'#da3633');
+  const atmIdx=labels.reduce((b,s,i)=>Math.abs(s-F)<Math.abs(labels[b]-F)?i:b,0);
+
+  // Expected range indices — fixed from open price
+  let rng=null;
+  if(Fopen&&atmIV&&dte){
+    rng=calcRange(Fopen,atmIV,dte);
+  }
+
+  if(gexChart)gexChart.destroy();
+  const ctx=document.getElementById('gex-chart').getContext('2d');
+  gexChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{label:'GEX (M)',data:vals,backgroundColor:colors,borderColor:borders,borderWidth:1,borderRadius:2}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:250},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            title:c=>`Strike: ${c[0].label}`,
+            label:c=>`GEX: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(2)}M`,
+            afterLabel:c=>{const r=gexRows[c.dataIndex];return[` Call: ${r.call.toLocaleString()}`,` Put:  ${r.put.toLocaleString()}`,` IV:   ${(r.volSettle*100).toFixed(2)}%`];}
+          },
+          backgroundColor:'#21262d',borderColor:'#30363d',borderWidth:1,
+          titleColor:'#e6edf3',bodyColor:'#8b949e',padding:10,cornerRadius:8,
+        },
+      },
+      scales:{
+        x:{ticks:{color:'#8b949e',font:{size:10},maxRotation:45},grid:{color:'#21262d'}},
+        y:{ticks:{color:'#8b949e',font:{size:10},callback:v=>`${v>=0?'+':''}${v.toFixed(1)}M`},grid:{color:'#21262d'},
+           title:{display:true,text:'Gamma Exposure (M USD)',color:'#8b949e',font:{size:10}}}
+      }
+    },
+    plugins:[{
+      id:'overlay',
+      afterDraw(chart){
+        const{ctx:c,chartArea:{top,bottom,left,right},scales:{x,y}}=chart;
+        const zero=y.getPixelForValue(0);
+
+        // 2σ zone (lighter purple)
+        if(rng){
+          const lo2i=labels.reduce((b,s,i)=>Math.abs(s-rng.lo2)<Math.abs(labels[b]-rng.lo2)?i:b,0);
+          const hi2i=labels.reduce((b,s,i)=>Math.abs(s-rng.hi2)<Math.abs(labels[b]-rng.hi2)?i:b,0);
+          const lo1i=labels.reduce((b,s,i)=>Math.abs(s-rng.lo1)<Math.abs(labels[b]-rng.lo1)?i:b,0);
+          const hi1i=labels.reduce((b,s,i)=>Math.abs(s-rng.hi1)<Math.abs(labels[b]-rng.hi1)?i:b,0);
+          const bw=x.getPixelForValue(1)-x.getPixelForValue(0);
+          const px=(i)=>x.getPixelForValue(i);
+          c.save();
+          // 2σ zone
+          c.fillStyle='rgba(139,87,229,.12)';
+          c.fillRect(px(lo2i),top,px(hi2i)-px(lo2i),bottom-top);
+          // 1σ zone
+          c.fillStyle='rgba(139,87,229,.22)';
+          c.fillRect(px(lo1i),top,px(hi1i)-px(lo1i),bottom-top);
+          // 1σ boundary lines
+          c.strokeStyle='rgba(163,113,247,.7)';c.lineWidth=1.5;c.setLineDash([4,3]);
+          [lo1i,hi1i].forEach(i=>{c.beginPath();c.moveTo(px(i),top);c.lineTo(px(i),bottom);c.stroke();});
+          c.setLineDash([]);c.restore();
+        }
+
+        // Zero line
+        c.save();c.strokeStyle='rgba(255,255,255,.15)';c.lineWidth=1;
+        c.beginPath();c.moveTo(left,zero);c.lineTo(right,zero);c.stroke();
+
+        // ATM line
+        const ax=x.getPixelForValue(atmIdx);
+        c.strokeStyle='#d29922';c.lineWidth=2;c.setLineDash([6,3]);
+        c.beginPath();c.moveTo(ax,top);c.lineTo(ax,bottom);c.stroke();
+        c.setLineDash([]);
+        c.fillStyle='#d29922';c.fillRect(ax-28,top,56,16);
+        c.fillStyle='#000';c.font='bold 10px system-ui';c.textAlign='center';
+        c.fillText(`ATM ${F?F.toFixed(2):''}`,ax,top+11);
+        c.restore();
+      }
+    }]
+  });
+}
+
+// ── Cumulative GEX Chart ───────────────────────────────
+function renderCumulative(){
+  const src=currentMode==='composite'
+    ?mergeComposite(parsedData.oi,parsedData.intraday,alpha)
+    :parsedData[currentMode==='oi'?'oi':'intraday'];
+  if(!src)return;
+  const gexData=currentMode==='composite'?{rows:src.rows,totalGex:src.totalGex}:calcGEX(src);
+  const rows=gexData.rows;
+  const labels=rows.map(r=>r.strike);
+  const cumVals=[];let sum=0;
+  rows.forEach(r=>{sum+=r.gex/1e6;cumVals.push(parseFloat(sum.toFixed(3)));});
+
+  // Find gamma flip
+  let flipStrike=null;
+  for(let i=1;i<cumVals.length;i++){
+    if(cumVals[i-1]*cumVals[i]<=0){flipStrike=labels[i];break;}
+  }
+
+  const F=src.futuresPrice;
+  const colors=cumVals.map(v=>v>=0?'rgba(88,166,255,.8)':'rgba(248,81,73,.8)');
+
+  if(cumChart)cumChart.destroy();
+  const ctx2=document.getElementById('cum-chart').getContext('2d');
+  cumChart=new Chart(ctx2,{
+    type:'line',
+    data:{labels,datasets:[{
+      label:'Σ GEX (M)',data:cumVals,
+      borderColor:'#a371f7',borderWidth:2,
+      backgroundColor:(ctx)=>{
+        const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
+        g.addColorStop(0,'rgba(163,113,247,.3)');g.addColorStop(1,'rgba(163,113,247,0)');
+        return g;
+      },
+      fill:true,tension:.3,pointRadius:0,pointHoverRadius:4,
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:250},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{title:c=>`Strike: ${c[0].label}`,label:c=>`Σ GEX: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(2)}M`},
+          backgroundColor:'#21262d',borderColor:'#30363d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#8b949e',padding:10,cornerRadius:8},
+      },
+      scales:{
+        x:{ticks:{color:'#8b949e',font:{size:10},maxRotation:45},grid:{color:'#21262d'}},
+        y:{ticks:{color:'#8b949e',font:{size:10},callback:v=>`${v>=0?'+':''}${v.toFixed(1)}M`},grid:{color:'#21262d'},
+           title:{display:true,text:'Cumulative GEX (M USD)',color:'#8b949e',font:{size:10}}}
+      }
+    },
+    plugins:[{
+      id:'cum-overlay',
+      afterDraw(chart){
+        const{ctx:c,chartArea:{top,bottom,left,right},scales:{x,y}}=chart;
+        const zero=y.getPixelForValue(0);
+        c.save();
+        c.strokeStyle='rgba(255,255,255,.3)';c.lineWidth=1.5;
+        c.beginPath();c.moveTo(left,zero);c.lineTo(right,zero);c.stroke();
+
+        if(flipStrike){
+          const fi=labels.indexOf(flipStrike);
+          if(fi>=0){
+            const fx=x.getPixelForValue(fi);
+            c.strokeStyle='#e3b341';c.lineWidth=2;c.setLineDash([6,3]);
+            c.beginPath();c.moveTo(fx,top);c.lineTo(fx,bottom);c.stroke();
+            c.setLineDash([]);
+            c.fillStyle='rgba(227,179,65,.2)';c.fillRect(fx-36,top,72,16);
+            c.fillStyle='#e3b341';c.font='bold 10px system-ui';c.textAlign='center';
+            c.fillText(`Flip ${flipStrike}`,fx,top+11);
+          }
+        }
+
+        if(F){
+          const atmi=labels.reduce((b,s,i)=>Math.abs(s-F)<Math.abs(labels[b]-F)?i:b,0);
+          const ax=x.getPixelForValue(atmi);
+          c.strokeStyle='#d29922';c.lineWidth=1.5;c.setLineDash([4,2]);
+          c.beginPath();c.moveTo(ax,top);c.lineTo(ax,bottom);c.stroke();
+          c.setLineDash([]);
+        }
+        c.restore();
+      }
+    }]
+  });
+
+  const netGex=gexData.totalGex/1e6;
+  const aboveFlip=F&&flipStrike?F>flipStrike:null;
+  document.getElementById('flip-analysis').innerHTML=`
+    <div class="level-card">
+      <div class="level-label">Gamma Flip Strike</div>
+      <div class="level-value val-gold">${flipStrike?`$${flipStrike}`:'—'}</div>
+      <div class="level-sub">จุด Cumulative GEX ข้ามศูนย์</div>
+    </div>
+    <div class="level-card">
+      <div class="level-label">ATM vs Flip</div>
+      <div class="level-value ${aboveFlip===true?'val-green':aboveFlip===false?'val-red':'val-n'}">
+        ${aboveFlip===true?'↑ เหนือ Flip':aboveFlip===false?'↓ ต่ำกว่า Flip':'—'}
+      </div>
+      <div class="level-sub">${aboveFlip===true?'Long Gamma → Mean-Revert':aboveFlip===false?'Short Gamma → Trending':'—'}</div>
+    </div>
+    <div class="level-card">
+      <div class="level-label">Net GEX รวม</div>
+      <div class="level-value ${netGex>=0?'val-green':'val-red'}">${netGex>=0?'+':''}${netGex.toFixed(1)}M</div>
+      <div class="level-sub">${netGex>=0?'Dealer Long Gamma':'Dealer Short Gamma'}</div>
+    </div>
+    <div class="level-card">
+      <div class="level-label">Market Regime</div>
+      <div class="level-value ${netGex>=0?'val-green':'val-red'}" style="font-size:14px;">
+        ${netGex>=0?'🟢 Low Vol / Range':'🔴 High Vol / Trend'}
+      </div>
+      <div class="level-sub">${netGex>=0?'ตลาดดูดราคากลับ':'ตลาดดันราคาต่อ'}</div>
+    </div>`;
+}
+
+// ── IV Rank ────────────────────────────────────────────
+function updateIVRank(currentIV){
+  if(currentIV>0&&!sessionIVs.includes(currentIV))sessionIVs.push(currentIV);
+  const el=document.getElementById('m-ivrank');
+  const sub=document.getElementById('m-ivrank-sub');
+  if(sessionIVs.length<2){el.textContent='—';el.className='metric-value val-n';sub.textContent='ต้องการ≥2 snapshots';return;}
+  const mn=Math.min(...sessionIVs), mx=Math.max(...sessionIVs);
+  if(mx===mn){el.textContent='—';return;}
+  const rank=Math.round((currentIV-mn)/(mx-mn)*100);
+  el.textContent=`${rank}%`;
+  el.className=`metric-value ${rank>=70?'val-red':rank<=30?'val-green':'val-gold'}`;
+  sub.textContent=rank>=70?'สูง → IV แพง (Short Vega)':rank<=30?'ต่ำ → IV ถูก (Long Gamma)':'กลาง → ดูบริบทประกอบ';
+}
+
+// ── Vol Skew ───────────────────────────────────────────
+function updateSkew(rows,F,atmIV){
+  const el=document.getElementById('m-skew');
+  const sub=document.getElementById('m-skew-sub');
+  if(!rows||!F||!atmIV){el.textContent='—';return;}
+  const delta=F*0.05;
+  const putTarget=F-delta, callTarget=F+delta;
+  const putRow=rows.reduce((b,r)=>Math.abs(r.strike-putTarget)<Math.abs(b.strike-putTarget)?r:b,rows[0]);
+  const callRow=rows.reduce((b,r)=>Math.abs(r.strike-callTarget)<Math.abs(b.strike-callTarget)?r:b,rows[0]);
+  if(!putRow?.volSettle||!callRow?.volSettle){el.textContent='—';return;}
+  const skew=(putRow.volSettle-callRow.volSettle)*100;
+  el.textContent=`${skew>=0?'+':''}${skew.toFixed(2)} vp`;
+  el.className=`metric-value ${skew>2?'val-red':skew<-2?'val-green':'val-n'}`;
+  sub.textContent=skew>2?`+Put premium (Bear hedge ↑)`:skew<-2?`+Call premium (Bull demand ↑)`:`Neutral Skew`;
+}
+
+// ── Decision Engine helpers ────────────────────────────
+function gapFillBucket(absGap){
+  if(absGap<5)   return {rate:97.6,label:'<$5',  bucket:'A',score:18,note:'Fade ได้เลย — Edge เกือบ 100%'};
+  if(absGap<10)  return {rate:87.7,label:'$5-10',bucket:'B',score:14,note:'Fade + รอ Confirm'};
+  if(absGap<20)  return {rate:73.9,label:'$10-20',bucket:'C',score:10,note:'ต้องการ OI Zone ยืนยัน'};
+  if(absGap<30)  return {rate:70.4,label:'$20-30',bucket:'D',score:8, note:'ระวัง — ต้องการ signal คู่'};
+  if(absGap<50)  return {rate:55.2,label:'$30-50',bucket:'E',score:-5,note:'เสี่ยงสูง — ไม่แนะนำ Fade'};
+  return            {rate:38.7,label:'>$50', bucket:'F',score:-18,note:'No Edge — Skip หรือ Momentum'};
+}
+function regimeFromIV(ivPct){
+  if(ivPct<15)  return {name:'Low',     emoji:'🟢',color:'var(--green-l)',sizePct:'5-7%', stopRange:'$8-12'};
+  if(ivPct<22)  return {name:'Mid',     emoji:'🟡',color:'var(--gold-l)', sizePct:'3-5%', stopRange:'$12-20'};
+  if(ivPct<30)  return {name:'High',    emoji:'🟠',color:'#f7861f',       sizePct:'2-3%', stopRange:'$20-35'};
+  return         {name:'Extreme',emoji:'🔴',color:'var(--red-l)',  sizePct:'1-2%', stopRange:'$30-60'};
+}
+
+// ── Decision Engine ────────────────────────────────────
+function decideZone(src, gexData, lv){
+  const F = src.futuresPrice;
+  const O = src.openPrice || F;
+  const dte = src.dte;
+  const iv = src.atmIV;
+  const ivChg = src.ivChg;
+  const futChg = src.futChg;
+  if(!F || !O || !dte || !iv) return null;
+  const sig = iv/100;
+  const sd1d = O * sig * Math.sqrt(1/252);
+  const sd2d = 2 * sd1d;
+  const upTrigger = O + sd1d;
+  const dnTrigger = O - sd1d;
+  const upActionTop = O + sd2d;
+  const dnActionBot = O - sd2d;
+  const cw = lv?.callWall?.strike || null;
+  const pw = lv?.putWall?.strike || null;
+  const dgc = lv?.dgcWall || null;
+  const flipUp = lv?.flipAbove?.strike || null;
+  const flipDn = lv?.flipBelow?.strike || null;
+  const totalGex = gexData.totalGex / 1e6;
+  const longGammaRegime = totalGex >= 0;
+  const distFromOpen = F - O;
+  const sdPos = sd1d > 0 ? distFromOpen / sd1d : 0;
+  const absSdPos = Math.abs(sdPos);
+
+  let quadrant, quadrantNote;
+  if(futChg > 1 && ivChg > 0)       { quadrant='Long Buildup / Vanna Risk'; quadrantNote='Price↑+IV↑ → Dealer chase (Gold squeeze fuel)'; }
+  else if(futChg > 1 && ivChg <= 0) { quadrant='Healthy Drift';              quadrantNote='Price↑+IV↓ → Vol Crush, news priced in'; }
+  else if(futChg < -1 && ivChg > 0) { quadrant='Panic / Short Buildup';      quadrantNote='Price↓+IV↑ → Real fear, hedging demand'; }
+  else if(futChg < -1 && ivChg <= 0){ quadrant='Long Liquidation';           quadrantNote='Price↓+IV↓ → Stops cleared, not new trend'; }
+  else                              { quadrant='Neutral';                    quadrantNote='No directional bias yet'; }
+
+  let timeWarn = null;
+  try {
+    const bkk = nowBKK();
+    if(bkk.getDay() === 5 && bkk.getHours() >= 20) timeWarn = 'Friday late — Charm unwind, range +15-20%';
+    else if(bkk.getDay() === 5) timeWarn = 'Friday — wider range expected';
+  } catch(e) {}
+
+  const reasons = { long:[], short:[], shared:[] };
+  let scoreLong = 0, scoreShort = 0;
+
+  if(absSdPos < 1) {
+    reasons.shared.push({tag:'warn', txt:`ราคาอยู่ใน No-Trade Zone (${absSdPos.toFixed(2)}σ จาก Open) — Edge ต่ำ`, score:-10});
+    scoreLong -= 10; scoreShort -= 10;
+  } else if(absSdPos < 2) {
+    if(sdPos < 0) { reasons.long.push({tag:'pos', txt:`ราคาทะลุ DOWN Trigger ลงมาในโซน Action (−${absSdPos.toFixed(2)}σ)`, score:18}); scoreLong += 18; }
+    else          { reasons.short.push({tag:'pos', txt:`ราคาทะลุ UP Trigger ขึ้นในโซน Action (+${absSdPos.toFixed(2)}σ)`, score:18}); scoreShort += 18; }
+  } else {
+    if(sdPos < 0) { reasons.long.push({tag:'pos', txt:`ราคาอยู่ในโซน Extreme (−${absSdPos.toFixed(2)}σ) — Reversion สูง`, score:22}); scoreLong += 22; }
+    else          { reasons.short.push({tag:'pos', txt:`ราคาอยู่ในโซน Extreme (+${absSdPos.toFixed(2)}σ) — Reversion สูง`, score:22}); scoreShort += 22; }
+  }
+
+  const gap = gapFillBucket(Math.abs(futChg));
+  if(absSdPos > 0.3) {
+    if(futChg < 0) { reasons.long.push({tag:gap.score>0?'pos':'neg', txt:`Gap ${gap.label} → ${gap.rate}% fill rate (${gap.note})`, score:gap.score}); scoreLong += gap.score; }
+    else if(futChg > 0) { reasons.short.push({tag:gap.score>0?'pos':'neg', txt:`Gap ${gap.label} → ${gap.rate}% fill rate (${gap.note})`, score:gap.score}); scoreShort += gap.score; }
+  }
+
+  if(longGammaRegime) {
+    reasons.shared.push({tag:'pos', txt:`Net GEX ${totalGex>=0?'+':''}${totalGex.toFixed(1)}M — Long Gamma regime, Mean-Revert`, score:14});
+    scoreLong += 14; scoreShort += 14;
+  } else {
+    reasons.shared.push({tag:'warn', txt:`Net GEX ${totalGex.toFixed(1)}M — Short Gamma, ตลาด Trending (Fade เสี่ยง)`, score:-12});
+    scoreLong -= 12; scoreShort -= 12;
+  }
+
+  if(pw && F > pw && (F - pw) < 1.5*sd1d) {
+    reasons.long.push({tag:'pos', txt:`ใกล้ Put Wall $${pw} (ระยะ $${(F-pw).toFixed(1)}) — Dealer Support`, score:14});
+    scoreLong += 14;
+  }
+  if(cw && F < cw && (cw - F) < 1.5*sd1d) {
+    reasons.short.push({tag:'pos', txt:`ใกล้ Call Wall $${cw} (ระยะ $${(cw-F).toFixed(1)}) — Dealer Resistance`, score:14});
+    scoreShort += 14;
+  }
+
+  if(flipUp && F >= flipUp) {
+    reasons.shared.push({tag:'pos', txt:`ราคาอยู่เหนือ Gamma Flip ↑ $${flipUp} → Pinning ใช้งานได้`, score:8});
+    scoreLong += 8; scoreShort += 8;
+  } else if(flipDn && F < flipDn) {
+    reasons.shared.push({tag:'warn', txt:`ราคาต่ำกว่า Gamma Flip ↓ $${flipDn} → Trending regime, ระวัง Fade`, score:-10});
+    scoreLong -= 10; scoreShort -= 10;
+  }
+
+  if(futChg > 0 && ivChg > 0.3) {
+    reasons.short.push({tag:'neg', txt:`⚠ Vanna risk — Spot↑+IV↑ ดันให้ MM ไล่ซื้อ (Gold Squeeze)`, score:-15});
+    scoreShort -= 15;
+  }
+  if(futChg < -1 && ivChg > 0.5) {
+    reasons.long.push({tag:'neg', txt:`⚠ Panic Hedging — Spot↓+IV↑ ฝั่ง Long ยังเสี่ยง Cascading`, score:-12});
+    scoreLong -= 12;
+  }
+
+  const regime = regimeFromIV(iv);
+  if(regime.name === 'Extreme') {
+    reasons.shared.push({tag:'warn', txt:`${regime.emoji} Extreme Regime (IV ${iv.toFixed(1)}%) — ลด size, stops กว้าง`, score:-8});
+    scoreLong -= 8; scoreShort -= 8;
+  } else if(regime.name === 'Mid') {
+    reasons.shared.push({tag:'pos', txt:`${regime.emoji} Mid Regime (IV ${iv.toFixed(1)}%) — best risk-adjusted`, score:5});
+    scoreLong += 5; scoreShort += 5;
+  }
+
+  if(timeWarn) {
+    reasons.shared.push({tag:'warn', txt:timeWarn, score:-5});
+    scoreLong -= 5; scoreShort -= 5;
+  }
+
+  let verdict, action, tagline, entry, stop, target, plan_reasons;
+  const margin = scoreLong - scoreShort;
+  const winnerScore = Math.max(scoreLong, scoreShort);
+
+  if(winnerScore < 18 || Math.abs(margin) < 8) {
+    verdict = 'neutral';
+    if(absSdPos < 1) { action = 'NO TRADE'; tagline = 'ราคายังอยู่ใน No-Trade Zone (±1σ) — รอราคาทะลุ Trigger ก่อน'; }
+    else { action = 'WAIT'; tagline = 'Signals ขัดแย้งกัน — รอ confirmation เพิ่มเติม'; }
+    entry = stop = target = null;
+    plan_reasons = [...reasons.shared];
+  } else if(margin > 0) {
+    verdict = 'long';
+    action = winnerScore >= 50 ? 'STRONG LONG' : 'LEAN LONG';
+    tagline = 'Fade ลงไปต่ำ — เด้งกลับสู่ Open/DGC';
+    const entryHi = Math.max(dnTrigger, pw ? pw + 5 : dnTrigger);
+    const entryLo = Math.min(F, dnActionBot);
+    entry = { lo:entryLo, hi:entryHi, mid:(entryLo+entryHi)/2 };
+    stop = pw ? Math.min(pw - 0.5*sd1d, O - 2.5*sd1d) : O - 2.5*sd1d;
+    target = dgc && dgc > entry.mid ? dgc : O;
+    plan_reasons = [...reasons.long, ...reasons.shared];
+  } else {
+    verdict = 'short';
+    action = winnerScore >= 50 ? 'STRONG SHORT' : 'LEAN SHORT';
+    tagline = 'Fade ขึ้นไปสูง — ย่อกลับสู่ Open/DGC';
+    const entryLo = Math.min(upTrigger, cw ? cw - 5 : upTrigger);
+    const entryHi = Math.max(F, upActionTop);
+    entry = { lo:entryLo, hi:entryHi, mid:(entryLo+entryHi)/2 };
+    stop = cw ? Math.max(cw + 0.5*sd1d, O + 2.5*sd1d) : O + 2.5*sd1d;
+    target = dgc && dgc < entry.mid ? dgc : O;
+    plan_reasons = [...reasons.short, ...reasons.shared];
+  }
+  const confidence = Math.max(0, Math.min(100, winnerScore));
+  const winProb = verdict==='neutral' ? null : gap.rate;
+  return {
+    verdict, action, tagline, confidence,
+    entry, stop, target, winProb,
+    sd1d, sd2d, upTrigger, dnTrigger,
+    scoreLong, scoreShort, reasons: plan_reasons,
+    regime, gap, quadrant, quadrantNote, timeWarn,
+    longGammaRegime, totalGex, sdPos, absSdPos
+  };
+}
+
+// ── Render Decision Engine ─────────────────────────────
+function renderDecisionEngine(d, src){
+  if(!d){
+    document.getElementById('zde-action').textContent='Waiting for data…';
+    return;
+  }
+  const verdict = document.getElementById('zde-verdict');
+  const actionEl = document.getElementById('zde-action');
+  const iconEl = document.getElementById('zde-icon');
+  const labelEl = document.getElementById('zde-vlabel');
+
+  verdict.className = 'zde-verdict ' + d.verdict;
+  actionEl.className = 'zde-action ' + d.verdict;
+  iconEl.textContent = d.verdict==='long'?'📈':d.verdict==='short'?'📉':'⏸';
+  labelEl.textContent = d.verdict==='neutral' ? 'No Edge' : 'Direction';
+  actionEl.textContent = d.action;
+  document.getElementById('zde-tagline').textContent = d.tagline;
+  document.getElementById('zde-confnum').textContent = `${d.confidence.toFixed(0)} / 100`;
+  document.getElementById('zde-confbar').style.width = `${d.confidence}%`;
+
+  const fmt = (v) => v==null ? '—' : `$${v.toFixed(2)}`;
+  if(d.entry && d.stop != null && d.target != null){
+    const entryMid = d.entry.mid;
+    document.getElementById('zde-entry').textContent = `${fmt(d.entry.lo)} - ${fmt(d.entry.hi)}`;
+    document.getElementById('zde-entry-sub').textContent = `mid ${fmt(entryMid)}  (${d.verdict==='long'?'≈Put Wall':'≈Call Wall'})`;
+    document.getElementById('zde-stop').textContent = fmt(d.stop);
+    document.getElementById('zde-stop-sub').textContent = `Δ ${(Math.abs(d.stop-entryMid)).toFixed(1)} pts  (${(Math.abs(d.stop-entryMid)/d.sd1d).toFixed(2)}σ-D)`;
+    document.getElementById('zde-target').textContent = fmt(d.target);
+    document.getElementById('zde-target-sub').textContent = `Δ ${(Math.abs(d.target-entryMid)).toFixed(1)} pts  (Open / DGC)`;
+    const rr = Math.abs(d.target - entryMid) / Math.abs(d.stop - entryMid);
+    const rrEl = document.getElementById('zde-rr');
+    rrEl.textContent = `1 : ${rr.toFixed(2)}`;
+    rrEl.style.color = rr >= 2 ? 'var(--green-l)' : rr >= 1 ? 'var(--gold-l)' : 'var(--red-l)';
+    document.getElementById('zde-winp').textContent = d.winProb!=null ? `${d.winProb.toFixed(0)}%` : '—';
+    const account = parseFloat(document.getElementById('zp-account')?.value) || 10000;
+    const riskPct = parseFloat(document.getElementById('zp-risk')?.value) || 1;
+    const stopDist = Math.abs(d.stop - entryMid);
+    const lots = (account * riskPct / 100) / (stopDist * 100);
+    document.getElementById('zde-lots').textContent = lots.toFixed(2);
+  } else {
+    document.getElementById('zde-entry').textContent = '—';
+    document.getElementById('zde-entry-sub').textContent = `wait > ±1σ-D from Open`;
+    document.getElementById('zde-stop').textContent = '—';
+    document.getElementById('zde-stop-sub').textContent = '—';
+    document.getElementById('zde-target').textContent = '—';
+    document.getElementById('zde-target-sub').textContent = '—';
+    document.getElementById('zde-rr').textContent = '—';
+    document.getElementById('zde-winp').textContent = '—';
+    document.getElementById('zde-lots').textContent = '—';
+  }
+
+  const seen = new Set();
+  const reasons = d.reasons
+    .filter(r => { if(seen.has(r.txt)) return false; seen.add(r.txt); return true; })
+    .sort((a,b) => Math.abs(b.score) - Math.abs(a.score))
+    .slice(0,6);
+  const reasonsHtml = reasons.map(r => {
+    const mark = r.tag==='pos'?'✓':r.tag==='neg'?'✗':'⚠';
+    const sign = r.score>=0?'+':'';
+    return `<div class="zde-reason ${r.tag}">
+      <span class="zde-rmark">${mark}</span>
+      <span class="zde-rtxt">${r.txt}</span>
+      <span class="zde-rscore">${sign}${r.score}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('zde-reasons').innerHTML = reasonsHtml || '<div class="zde-reason"><span class="zde-rmark">•</span><span class="zde-rtxt" style="color:var(--muted);">ไม่มี signal เด่นชัด</span></div>';
+
+  const chips = [];
+  chips.push(`<span class="zde-chip ${d.longGammaRegime?'ok':'danger'}">GEX ${d.totalGex>=0?'+':''}${d.totalGex.toFixed(1)}M</span>`);
+  chips.push(`<span class="zde-chip ${d.regime.name==='Extreme'?'danger':d.regime.name==='High'?'warn':d.regime.name==='Mid'?'info':'ok'}">${d.regime.emoji} ${d.regime.name} (IV ${src.atmIV.toFixed(1)}%)</span>`);
+  chips.push(`<span class="zde-chip info">Gap ${d.gap.label} → ${d.gap.rate}%</span>`);
+  chips.push(`<span class="zde-chip">σ-D ±$${d.sd1d.toFixed(1)}  (Triggers ${d.dnTrigger.toFixed(0)}/${d.upTrigger.toFixed(0)})</span>`);
+  chips.push(`<span class="zde-chip ${d.quadrant==='Long Buildup / Vanna Risk'||d.quadrant==='Panic / Short Buildup'?'warn':'info'}">📦 ${d.quadrant}</span>`);
+  if(d.timeWarn) chips.push(`<span class="zde-chip warn">⏰ ${d.timeWarn}</span>`);
+  const dailyEMpct = src.atmIV/16;
+  chips.push(`<span class="zde-chip">Daily EM ≈ ${dailyEMpct.toFixed(2)}%</span>`);
+  const vrp = src.atmIV - 15.7;
+  chips.push(`<span class="zde-chip ${vrp>5?'ok':vrp<-3?'danger':''}">VRP ${vrp>=0?'+':''}${vrp.toFixed(1)}pp vs hist RV</span>`);
+  document.getElementById('zde-meta').innerHTML = chips.join('');
+}
+
+// ── Snapshot Delta (Call/Put Change vs Previous) ───────
+function computeSnapshotDelta(curr, prev){
+  if(!curr || !prev || !curr.rows || !prev.rows) return null;
+  const prevMap = new Map(prev.rows.map(r => [r.strike, r]));
+  const deltas = curr.rows.map(c => {
+    const p = prevMap.get(c.strike) || {call:0, put:0};
+    return {strike:c.strike, dCall:c.call - p.call, dPut:c.put - p.put,
+            callNow:c.call, putNow:c.put, callPrev:p.call||0, putPrev:p.put||0};
+  });
+  const totalDCall = deltas.reduce((s,d) => s + d.dCall, 0);
+  const totalDPut  = deltas.reduce((s,d) => s + d.dPut, 0);
+  const totalCall  = curr.callTotal || curr.rows.reduce((s,r)=>s+r.call,0);
+  const totalPut   = curr.putTotal  || curr.rows.reduce((s,r)=>s+r.put,0);
+
+  const sorted = deltas
+    .flatMap(d => [{strike:d.strike,type:'C',delta:d.dCall,now:d.callNow},
+                   {strike:d.strike,type:'P',delta:d.dPut, now:d.putNow}])
+    .filter(x => x.delta !== 0)
+    .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const topUp   = sorted.filter(x => x.delta > 0).slice(0,6);
+  const topDown = sorted.filter(x => x.delta < 0).slice(0,6);
+
+  let quadrant, qColor;
+  const absC = Math.abs(totalDCall), absP = Math.abs(totalDPut);
+  if(totalDCall > 0 && totalDCall > absP)                  { quadrant='📈 Call Build (Bullish flow)';  qColor='var(--green-l)'; }
+  else if(totalDPut > 0 && totalDPut > absC)               { quadrant='📉 Put Build (Bearish flow)';   qColor='var(--red-l)'; }
+  else if(totalDCall < 0 && Math.abs(totalDCall) > absP)   { quadrant='⬇ Call Unwind';                 qColor='var(--gold-l)'; }
+  else if(totalDPut < 0 && Math.abs(totalDPut) > absC)     { quadrant='⬇ Put Unwind';                  qColor='var(--blue-l)'; }
+  else                                                      { quadrant='Mixed / Quiet';                qColor='var(--muted)'; }
+
+  return {totalDCall, totalDPut, totalCall, totalPut, topUp, topDown, quadrant, qColor};
+}
+
+function renderSnapshotDelta(delta, mode){
+  const totalCallEl  = document.getElementById('delta-call-total');
+  const totalPutEl   = document.getElementById('delta-put-total');
+  const quadrantEl   = document.getElementById('delta-quadrant');
+  const metaEl       = document.getElementById('delta-meta');
+  const upList       = document.getElementById('delta-up-list');
+  const dnList       = document.getElementById('delta-dn-list');
+  if(!totalCallEl) return;
+  if(!delta){
+    totalCallEl.textContent='—'; totalCallEl.className='zp-out-val val-n';
+    totalPutEl.textContent ='—'; totalPutEl.className='zp-out-val val-n';
+    quadrantEl.textContent='—'; quadrantEl.style.color='var(--muted)';
+    metaEl.textContent='โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ';
+    upList.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px;">ยังไม่มีข้อมูล previous</div>';
+    dnList.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px;">ยังไม่มีข้อมูล previous</div>';
+    return;
+  }
+  const cSign = delta.totalDCall>=0?'+':'';
+  const pSign = delta.totalDPut>=0?'+':'';
+  const cPct  = delta.totalCall>0 ? (delta.totalDCall/delta.totalCall*100) : 0;
+  const pPct  = delta.totalPut>0  ? (delta.totalDPut/delta.totalPut*100)   : 0;
+  totalCallEl.textContent = `${cSign}${delta.totalDCall.toLocaleString()} (${cSign}${cPct.toFixed(1)}%)`;
+  totalCallEl.className = `zp-out-val ${delta.totalDCall>0?'val-green':delta.totalDCall<0?'val-red':'val-n'}`;
+  totalPutEl.textContent = `${pSign}${delta.totalDPut.toLocaleString()} (${pSign}${pPct.toFixed(1)}%)`;
+  totalPutEl.className = `zp-out-val ${delta.totalDPut>0?'val-red':delta.totalDPut<0?'val-green':'val-n'}`;
+  quadrantEl.textContent = delta.quadrant;
+  quadrantEl.style.color = delta.qColor;
+  try{
+    const prev = previousMeta[mode]?.date, curr = currentMeta[mode]?.date;
+    if(prev && curr){
+      const dt = (new Date(curr) - new Date(prev))/60000;
+      const unit = mode==='intraday'?'Intraday Volume':'Open Interest';
+      metaEl.textContent = `${unit} · ${fmtTimeBKK(prev)} → ${fmtTimeBKK(curr)} (Δ ${dt.toFixed(0)} นาที)`;
+    }
+  }catch(e){}
+  const fmt = (x) => {
+    const tcls = x.type==='C'?'val-green':'val-red';
+    const sign = x.delta>=0?'+':'';
+    const arrow = x.delta>=0?'▲':'▼';
+    return `<div class="delta-row ${x.delta>=0?'up':'dn'}">
+      <span class="ds">$${x.strike}</span>
+      <span class="dt ${tcls}">${x.type}</span>
+      <span class="dv">${arrow} ${sign}${x.delta.toLocaleString()}</span>
+      <span class="dt" style="font-size:10px;color:var(--muted);">→ ${x.now.toLocaleString()}</span>
+    </div>`;
+  };
+  upList.innerHTML = delta.topUp.length ? delta.topUp.map(fmt).join('') : '<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการเพิ่ม</div>';
+  dnList.innerHTML = delta.topDown.length ? delta.topDown.map(fmt).join('') : '<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการลด</div>';
+}
+
+// ── Block Strategy ─────────────────────────────────────
+function updateBlockStrategy(sd1d){
+  const el = document.getElementById('block-sd1d');
+  if(!el) return;
+  el.textContent = sd1d ? `$${sd1d.toFixed(1)}` : '—';
+  const p25 = document.getElementById('block-pill-25');
+  const p50 = document.getElementById('block-pill-50');
+  const p100= document.getElementById('block-pill-100');
+  [p25,p50,p100].forEach(p => p && p.classList.remove('active'));
+  if(!sd1d) return;
+  if(sd1d < 30)       p25?.classList.add('active');
+  else if(sd1d < 60)  p50?.classList.add('active');
+  else                p100?.classList.add('active');
+}
+
+// ── Recovery Lot Calculator ────────────────────────────
+function recoveryCalc(){
+  const init = parseFloat(document.getElementById('rec-initlot')?.value) || 0;
+  const sl   = parseFloat(document.getElementById('rec-sl')?.value) || 0;
+  const tp   = parseFloat(document.getElementById('rec-tp')?.value) || 0;
+  const N    = parseInt(document.getElementById('rec-maxn')?.value) || 6;
+  const tbody= document.getElementById('rec-tbody');
+  const sumEl= document.getElementById('rec-summary');
+  if(!tbody) return;
+  if(!init || !sl || !tp){ tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:10px;">กรอกค่าให้ครบ</td></tr>'; sumEl.textContent=''; return; }
+  const GC = 100;
+  const marginPerLot = 10000;
+  const targetProfit = init * tp * GC;
+  let cumLoss = 0;
+  let cumLots = 0;
+  const rows = [];
+  for(let i=1;i<=N;i++){
+    let lot;
+    if(i===1) lot = init;
+    else { lot = (cumLoss + targetProfit) / (tp * GC); lot = Math.ceil(lot * 100) / 100; }
+    const dir = (i%2===1) ? 'BUY' : 'SELL';
+    const winGain = lot * tp * GC;
+    const lossOnThis = lot * sl * GC;
+    const cumLossIfThisLoses = cumLoss + lossOnThis;
+    const margin = (cumLots + lot) * marginPerLot;
+    rows.push({i, dir, lot, winGain, winNet: winGain - cumLoss, cumLossIfThisLoses, margin});
+    cumLoss = cumLossIfThisLoses;
+    cumLots += lot;
+  }
+  tbody.innerHTML = rows.map(r =>
+    `<tr>
+      <td>#${r.i}</td>
+      <td style="color:${r.dir==='BUY'?'var(--green-l)':'var(--red-l)'};font-weight:700;">${r.dir}</td>
+      <td class="rec-lot">${r.lot.toFixed(2)}</td>
+      <td class="rec-win">+$${r.winNet.toFixed(0)} <span style="color:var(--muted);font-size:10px;">(gross +$${r.winGain.toFixed(0)})</span></td>
+      <td class="rec-loss">−$${r.cumLossIfThisLoses.toFixed(0)}</td>
+      <td style="color:var(--muted);">~$${(r.margin/1000).toFixed(1)}k</td>
+    </tr>`
+  ).join('');
+  const finalLot = rows[rows.length-1].lot;
+  const worstLoss = rows[rows.length-1].cumLossIfThisLoses;
+  sumEl.innerHTML = `
+    <strong style="color:var(--text);">เป้าหมาย Net Profit ต่อรอบ:</strong> $${targetProfit.toFixed(0)} ·
+    <strong>Final Lot ที่ #${N}:</strong> <span style="color:var(--gold-l);">${finalLot.toFixed(2)}</span> ·
+    <strong>Worst-case Loss:</strong> <span style="color:var(--red-l);">$${worstLoss.toFixed(0)}</span><br>
+    <span style="color:var(--muted);font-size:11px;">⚠ <strong>คำเตือน:</strong> Recovery ระบบนี้ทำงานเหมือน Martingale — lot โตเร็ว ต้องมีหน้าตักมาก ระวัง gap / fat-tail event เพราะ 1 ครั้งสะดุดอาจล้างพอร์ตได้ — แนะนำตั้ง <strong>max sequence ≤ ${N} ครั้ง</strong> แล้วยอม cut loss สะสม</span>
+  `;
+}
+
+// ── Render full dashboard ──────────────────────────────
+function renderAll(src){
+  const gexData=calcGEX(src);
+  const lv=calcLevels(gexData.rows,src.futuresPrice);
+  updateMetrics(src,gexData.totalGex);
+  updateIVRank(src.atmIV);
+  updateSkew(src.rows,src.futuresPrice,src.atmIV);
+  renderGEX(src,gexData.rows,gexData.totalGex);
+  updateLevels(lv,src.futuresPrice);
+  const decision = decideZone(src, gexData, lv);
+  renderDecisionEngine(decision, src);
+  const mode = currentMode==='composite' ? 'intraday' : currentMode;
+  const delta = computeSnapshotDelta(parsedData[mode], previousData[mode]);
+  renderSnapshotDelta(delta, mode);
+  updateBlockStrategy(decision?.sd1d);
+  if(currentTab==='cumulative')renderCumulative();
+  zpSyncFromData(src);
+}
+
+// ── Mode / Composite ───────────────────────────────────
+function setMode(mode){
+  currentMode=mode;
+  ['intraday','oi','composite'].forEach(m=>document.getElementById('btn-'+m).classList.toggle('active',m===mode));
+  document.getElementById('alpha-row').style.display=mode==='composite'?'flex':'none';
+  if(mode==='composite'){
+    const src=mergeComposite(parsedData.oi,parsedData.intraday,alpha);
+    if(src){renderAll(src);}
+    else{
+      Promise.all([ensureMode('intraday'),ensureMode('oi')]).then(()=>{
+        const s=mergeComposite(parsedData.oi,parsedData.intraday,alpha);
+        if(s)renderAll(s);
+      });
+    }
+  } else {
+    ensureMode(mode).then(()=>{
+      if(parsedData[mode])renderAll(parsedData[mode]);
+    });
+  }
+}
+function onAlphaChange(){
+  alpha=parseFloat(document.getElementById('alpha-slider').value);
+  document.getElementById('alpha-val').textContent=alpha.toFixed(2);
+  if(currentMode==='composite'&&parsedData.intraday&&parsedData.oi){
+    const src=mergeComposite(parsedData.oi,parsedData.intraday,alpha);
+    renderAll(src);
+  }
+}
+
+// ── Load snapshot ──────────────────────────────────────
+async function loadSnapshot(idx,mode){
+  const list=commits[mode];
+  if(!list||!list.length)return;
+  const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
+  if(parsedData[mode]){
+    previousData[mode]=parsedData[mode];
+    previousMeta[mode]=currentMeta[mode];
+  }
+  const raw=await fetchFileAtCommit(file,list[idx].sha);
+  parsedData[mode]=parseGBT(raw);
+  currentMeta[mode]={sha:list[idx].sha,date:list[idx].commit.author.date};
+  if(!previousData[mode] && list[idx+1]){
+    try{
+      const rawPrev=await fetchFileAtCommit(file,list[idx+1].sha);
+      previousData[mode]=parseGBT(rawPrev);
+      previousMeta[mode]={sha:list[idx+1].sha,date:list[idx+1].commit.author.date};
+    }catch(e){}
+  }
+  document.getElementById('freshness').textContent=`Snapshot: ${fmtTimeBKK(list[idx].commit.author.date)} BKK`;
+  return parsedData[mode];
+}
+
+// ── Snapshot buttons ───────────────────────────────────
+function renderSnaps(list,mode){
+  const row=document.getElementById('snapshot-row');
+  if(!list.length){row.innerHTML='<span style="color:var(--gold-l);font-size:12px;">⚠ ยังไม่มีข้อมูลวันนี้ — รอข้อมูล commit ใหม่</span>';return;}
+  row.innerHTML=list.map((c,i)=>`<button class="snap-btn${i===0?' active':''}" onclick="selectSnap(${i},'${mode}')">${fmtTimeBKK(c.commit.author.date)}</button>`).join('');
+}
+async function selectSnap(idx,mode){
+  document.querySelectorAll('.snap-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  await loadSnapshot(idx,mode);
+  if(currentMode===mode)renderAll(parsedData[mode]);
+  else if(currentMode==='composite'){
+    const src=mergeComposite(parsedData.oi,parsedData.intraday,alpha);
+    if(src)renderAll(src);
+  }
+}
+
+async function ensureMode(mode){
+  if(commits[mode].length===0){
+    const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
+    const row=document.getElementById('snapshot-row');
+    try{
+      const all=await fetchCommits(file,60);
+      if(!all||!all.length){
+        row.innerHTML=`<span style="color:var(--gold-l);font-size:12px;">⚠ ยังไม่มี commit สำหรับ ${file}</span>`;return;
+      }
+      const today=filterToday(all);
+      commits[mode]=today;
+      if(mode===currentMode)renderSnaps(today,mode);
+      await loadSnapshot(0,mode);
+    }catch(e){
+      row.innerHTML=`<span style="color:var(--red-l);font-size:12px;">⚠ ${e.message}</span>`;
+    }
+  }
+}
+
+async function refreshData(){
+  const btn=document.getElementById('refresh-btn');
+  btn.classList.add('spinning');btn.disabled=true;
+  commits={intraday:[],oi:[]};parsedData={intraday:null,oi:null};
+  previousData={intraday:null,oi:null};currentMeta={intraday:null,oi:null};previousMeta={intraday:null,oi:null};
+  sessionIVs=[];
+  await ensureMode(currentMode==='oi'?'oi':'intraday');
+  if(currentMode==='composite'){await ensureMode('oi');await ensureMode('intraday');}
+  const src=currentMode==='composite'?mergeComposite(parsedData.oi,parsedData.intraday,alpha):parsedData[currentMode];
+  if(src)renderAll(src);
+  btn.classList.remove('spinning');btn.disabled=false;
+}
+
+// ── Zone Planner ───────────────────────────────────────
+function zpSyncFromData(src){
+  const p=document.getElementById('zp-price');
+  const iv=document.getElementById('zp-iv');
+  const dte=document.getElementById('zp-dte');
+  const en=document.getElementById('zp-entry');
+  if(src.futuresPrice){p.value=src.futuresPrice.toFixed(2);}
+  if(src.atmIV){iv.value=src.atmIV.toFixed(2);}
+  if(src.dte){dte.value=src.dte.toFixed(2);}
+  if(src.futuresPrice&&!en.value){en.value=src.futuresPrice.toFixed(2);}
+  zpCalc();
+}
+function zpCalc(){
+  const F=parseFloat(document.getElementById('zp-price').value)||0;
+  const ivPct=parseFloat(document.getElementById('zp-iv').value)||0;
+  const dte=parseFloat(document.getElementById('zp-dte').value)||0;
+  const account=parseFloat(document.getElementById('zp-account').value)||10000;
+  const riskPct=parseFloat(document.getElementById('zp-risk').value)||1;
+  const mult=parseFloat(document.getElementById('zp-stopmult').value)||2;
+  if(!F||!ivPct||!dte){
+    document.getElementById('zone-grid').innerHTML='<div style="color:var(--muted);font-size:12px;">กรอกราคา, IV และ DTE เพื่อดูโซน</div>';
+    return;
+  }
+  const sig=ivPct/100;
+  const sd1=F*sig*Math.sqrt(dte/252);
+  const sd2=2*sd1, sd3=3*sd1;
+  const sd1d=F*sig*Math.sqrt(1/252);
+  const zones=[
+    {label:'+3σ',  price:F+sd3,  cls:'zone-3', desc:'Extreme — Reversion แรงมาก (0.3%)'},
+    {label:'+2σ',  price:F+sd2,  cls:'zone-2', desc:'Action Zone — รอ Confirmation (5%)'},
+    {label:'+1σ',  price:F+sd1,  cls:'zone-1', desc:'Watch Zone — ขอบ 1SD (32%)'},
+    {label:'1D +1σ',price:F+sd1d,cls:'zone-1', desc:'Daily +1σ range'},
+    {label:'OPEN', price:F,      cls:'zone-atm',desc:'ราคาเปิด / Fixed Center'},
+    {label:'1D −1σ',price:F-sd1d,cls:'zone-1', desc:'Daily −1σ range'},
+    {label:'−1σ',  price:F-sd1,  cls:'zone-1', desc:'Watch Zone — ขอบ 1SD (32%)'},
+    {label:'−2σ',  price:F-sd2,  cls:'zone-2', desc:'Action Zone — รอ Confirmation (5%)'},
+    {label:'−3σ',  price:F-sd3,  cls:'zone-3', desc:'Extreme — Reversion แรงมาก (0.3%)'},
+  ];
+  document.getElementById('zone-grid').innerHTML=zones.map(z=>`
+    <div class="zone-row ${z.cls}">
+      <span class="zone-label">${z.label}</span>
+      <span class="zone-price">$${z.price.toFixed(2)}</span>
+      <span class="zone-desc">${z.desc}</span>
+    </div>`).join('');
+  const riskDollar=account*(riskPct/100);
+  const stopDist=sd1*mult;
+  const GC_MULT=100;
+  const lots=riskDollar/(stopDist*GC_MULT);
+  document.getElementById('zp-out-risk').textContent=`$${riskDollar.toFixed(0)}`;
+  document.getElementById('zp-out-lots').textContent=lots.toFixed(3);
+  document.getElementById('zp-out-stop').textContent=`$${stopDist.toFixed(2)}`;
+  document.getElementById('zp-out-maxloss').textContent=`−$${(lots*stopDist*GC_MULT).toFixed(0)}`;
+  zpRR();
+  let regime='', regColor='';
+  if(ivPct<12){regime='🟢 Low Regime (IV <12%) — Size 5–7%, Stop $8–12';regColor='rgba(46,160,67,.15)';}
+  else if(ivPct<18){regime='🟡 Mid Regime (IV 12–18%) — Size 3–5%, Stop $12–20';regColor='rgba(210,153,34,.15)';}
+  else if(ivPct<30){regime='🟠 High Regime (IV 18–30%) — Size 2–3%, Stop $20–35';regColor='rgba(248,81,73,.12)';}
+  else{regime='🔴 Extreme Regime (IV >30%) — Size 1–2%, Stop $30–60 ระวังมาก';regColor='rgba(218,54,51,.2)';}
+  document.getElementById('sizer-regime').style.background=regColor;
+  document.getElementById('sizer-regime').style.border='1px solid rgba(255,255,255,.08)';
+  document.getElementById('sizer-regime').style.borderRadius='8px';
+  document.getElementById('sizer-regime').textContent=regime;
+}
+function zpRR(){
+  const entry=parseFloat(document.getElementById('zp-entry').value)||0;
+  const stop=parseFloat(document.getElementById('zp-stop').value)||0;
+  const target=parseFloat(document.getElementById('zp-target').value)||0;
+  const account=parseFloat(document.getElementById('zp-account').value)||10000;
+  const riskPct=parseFloat(document.getElementById('zp-risk').value)||1;
+  const GC_MULT=100;
+  if(!entry||!stop||!target){
+    document.getElementById('zp-out-rr').textContent='—';
+    document.getElementById('zp-out-profit').textContent='—';
+    return;
+  }
+  const stopDist=Math.abs(entry-stop);
+  const profitDist=Math.abs(target-entry);
+  const rr=profitDist/stopDist;
+  const riskDollar=account*(riskPct/100);
+  const lots=riskDollar/(stopDist*GC_MULT);
+  const profit=lots*profitDist*GC_MULT;
+  const rrEl=document.getElementById('zp-out-rr');
+  rrEl.textContent=`1 : ${rr.toFixed(2)}`;
+  rrEl.className=`zp-out-val ${rr>=2?'val-green':rr>=1?'val-gold':'val-red'}`;
+  document.getElementById('zp-out-maxloss').textContent=`−$${(lots*stopDist*GC_MULT).toFixed(0)}`;
+  document.getElementById('zp-out-profit').textContent=`+$${profit.toFixed(0)}`;
+  document.getElementById('zp-out-lots').textContent=lots.toFixed(3);
+  document.getElementById('zp-out-stop').textContent=`$${stopDist.toFixed(2)}`;
+}
+
+// ── Init ───────────────────────────────────────────────
+async function init(){
+  updateClock();setInterval(updateClock,30000);
+  recoveryCalc();
+  await ensureMode('intraday');
+  if(parsedData.intraday)renderAll(parsedData.intraday);
+  setInterval(()=>{if(!document.getElementById('setup-overlay').style.display||document.getElementById('setup-overlay').style.display==='none')refreshData();},5*60*1000);
+}
+</script>
+</body>
+</html>
