@@ -165,12 +165,14 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .zde-verdict{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;}
 .zde-verdict.long{background:linear-gradient(135deg,rgba(46,160,67,.18),rgba(46,160,67,.04));}
 .zde-verdict.short{background:linear-gradient(135deg,rgba(218,54,51,.18),rgba(218,54,51,.04));}
+.zde-verdict.scalp{background:linear-gradient(135deg,rgba(210,153,34,.18),rgba(210,153,34,.04));}
 .zde-verdict.neutral{background:linear-gradient(135deg,rgba(139,148,158,.10),rgba(139,148,158,.03));}
 .zde-icon{font-size:28px;line-height:1;margin-bottom:4px;}
 .zde-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
 .zde-action{font-size:22px;font-weight:800;margin:5px 0;letter-spacing:.02em;line-height:1.1;}
 .zde-action.long{color:var(--green-l);}
 .zde-action.short{color:var(--red-l);}
+.zde-action.scalp{color:var(--gold-l);}
 .zde-action.neutral{color:var(--muted);}
 .zde-tagline{font-size:11px;color:var(--muted);line-height:1.5;max-width:220px;}
 .zde-confbar{margin-top:10px;width:160px;height:7px;background:var(--bg);border-radius:4px;overflow:hidden;border:1px solid var(--border);}
@@ -552,7 +554,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <!-- Inputs card -->
     <div class="chart-card" style="padding:18px 20px;">
       <div class="chart-title" style="margin-bottom:14px;">⚙️ ตั้งค่า</div>
-      <div class="zp-row"><label>Futures Price ($)</label><input type="number" id="zp-price" step="0.1" oninput="zpCalc()"></div>
+      <div class="zp-row"><label>Open Price ($)</label><input type="number" id="zp-price" step="0.1" oninput="zpCalc()" title="ราคาเปิด — ใช้เป็นจุดศูนย์กลาง Fixed สำหรับ σ bands"></div>
       <div class="zp-row"><label>ATM IV (%)</label><input type="number" id="zp-iv" step="0.01" oninput="zpCalc()"></div>
       <div class="zp-row"><label>DTE (วัน)</label><input type="number" id="zp-dte" step="0.01" oninput="zpCalc()"></div>
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -596,6 +598,47 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
           <div class="zp-out"><div class="zp-out-label">Target Profit ($)</div><div class="zp-out-val val-green" id="zp-out-profit">—</div></div>
         </div>
         <div id="sizer-regime" style="margin-top:12px;padding:10px 14px;border-radius:var(--r);font-size:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 1.5: Expected Move at Target Price -->
+  <div class="chart-card" style="padding:18px 20px;">
+    <div class="chart-title" style="margin-bottom:4px;">🎯 Expected Move at Target Price</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">ถ้าราคาไปถึง Target ที่ตั้งไว้ — Vol Settle ณ Strike นั้น (จากเส้นโค้งสีแดง) บอกว่าราคาจะขยับได้อีกกี่ $ → ใช้กำหนด TP / SL</div>
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;">
+      <!-- Input -->
+      <div>
+        <div class="zp-row">
+          <label>Target Price ($)</label>
+          <input type="number" id="zp-target-price" step="0.5" placeholder="e.g. 4600" oninput="zpTargetCalc()" style="width:160px;background:var(--bg);border:1px solid var(--gold);color:var(--text);padding:6px 10px;border-radius:var(--r);font-size:13px;font-family:'Fira Code',monospace;outline:none;">
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6;">
+          สูตร: <strong style="color:var(--text);">Move = Target × Vol<sub>settle@strike</sub> × √(DTE/252)</strong><br>
+          Vol Settle ดึงจาก Strike ที่ใกล้ Target ที่สุดในข้อมูลจริง<br>
+          DTE ใช้ค่า real-time (snapshot ล่าสุด)
+        </div>
+      </div>
+      <!-- Output -->
+      <div id="target-move-result" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+        <div class="zp-out"><div class="zp-out-label">Strike ที่ใช้</div><div class="zp-out-val val-gold" id="tm-strike">—</div></div>
+        <div class="zp-out"><div class="zp-out-label">Vol Settle ณ Strike</div><div class="zp-out-val val-blue" id="tm-vol">—</div></div>
+        <div class="zp-out"><div class="zp-out-label">DTE ที่ใช้</div><div class="zp-out-val val-n" id="tm-dte">—</div></div>
+        <div class="zp-out" style="background:rgba(139,87,229,.1);border-color:rgba(139,87,229,.4);">
+          <div class="zp-out-label">Expected Move (±)</div>
+          <div class="zp-out-val val-purple" id="tm-move">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px;">68.2% probability range</div>
+        </div>
+        <div class="zp-out" style="background:rgba(46,160,67,.1);border-color:rgba(46,160,67,.4);">
+          <div class="zp-out-label">TP Guideline (+1σ)</div>
+          <div class="zp-out-val val-green" id="tm-tp">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px;">Target + 1σ move</div>
+        </div>
+        <div class="zp-out" style="background:rgba(218,54,51,.1);border-color:rgba(218,54,51,.4);">
+          <div class="zp-out-label">SL Guideline (−1σ)</div>
+          <div class="zp-out-val val-red" id="tm-sl">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px;">Target − 1σ move</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1166,7 +1209,10 @@ let previousMeta={intraday:null,oi:null};   // {sha, date} of previous snapshot
 let currentMeta={intraday:null,oi:null};    // {sha, date} of current snapshot
 let gexChart=null, cumChart=null;
 let currentTab='gex';
-let sessionIVs=[];  // collect ATM IV across snapshots for IV Rank
+let sessionIVs=[];        // ATM IV across snapshots for IV Rank
+let firstOfDay={intraday:null,oi:null};  // earliest snapshot of the session → fixed SD reference
+let zpCurrentRows=null;   // rows from latest snapshot for vol settle lookup
+let zpCurrentDTE=null;    // current DTE for target-move calc
 
 // ── Tab switching ──────────────────────────────────────
 function switchTab(tab) {
@@ -1354,10 +1400,14 @@ function updateMetrics(parsed,totalGex){
   document.getElementById('m-gex').className=`metric-value ${gM>=0?'val-green':'val-red'}`;
   document.getElementById('m-gex-bias').textContent=gM>0?'Long Gamma — ตลาด Mean-Revert':'Short Gamma — ระวัง Trending';
 
-  const{openPrice}=parsed;
-  const Fopen=openPrice||F;
-  if(Fopen&&atmIV&&dte){
-    const rng=calcRange(Fopen,atmIV,dte);
+  // Use first-of-day snapshot for FIXED SD (same as CME's fixed morning reference)
+  const modeKey=currentMode==='oi'?'oi':'intraday';
+  const ref=firstOfDay[modeKey]||parsed;
+  const Fopen=ref.openPrice||ref.futuresPrice||F;
+  const refIV=ref.atmIV||atmIV;
+  const refDTE=ref.dte||dte;
+  if(Fopen&&refIV&&refDTE){
+    const rng=calcRange(Fopen,refIV,refDTE);
     document.getElementById('m-r16exp').textContent=`±$${rng.r1exp.toFixed(2)}`;
     document.getElementById('m-r16exp-range').textContent=`${rng.lo1.toFixed(2)} — ${rng.hi1.toFixed(2)}`;
     document.getElementById('m-r16day').textContent=`±$${rng.r1day.toFixed(2)}`;
@@ -1366,7 +1416,7 @@ function updateMetrics(parsed,totalGex){
     document.getElementById('rb-2exp').textContent=`${rng.lo2.toFixed(2)}–${rng.hi2.toFixed(2)}`;
     document.getElementById('rb-1day').textContent=`${rng.lo1d.toFixed(2)}–${rng.hi1d.toFixed(2)}`;
     const openEl=document.getElementById('rb-open-label');
-    if(openEl)openEl.textContent=`Open: $${Fopen.toFixed(2)}`;
+    if(openEl)openEl.textContent=`Open: $${Fopen.toFixed(2)} | 1σ=±$${rng.r1exp.toFixed(2)}`;
   }
 }
 function updateLevels(lv,F){
@@ -1387,18 +1437,22 @@ function updateLevels(lv,F){
 
 // ── GEX Chart ──────────────────────────────────────────
 function renderGEX(parsed,gexRows,totalGex){
-  const{futuresPrice:F,openPrice,dte,atmIV}=parsed;
-  const Fopen=openPrice||F;
+  const{futuresPrice:F}=parsed;
+  const modeKey=currentMode==='oi'?'oi':'intraday';
+  const ref=firstOfDay[modeKey]||parsed;
+  const Fopen=ref.openPrice||ref.futuresPrice||F;
+  const refIV=ref.atmIV||parsed.atmIV;
+  const refDTE=ref.dte||parsed.dte;
   const labels=gexRows.map(r=>r.strike);
   const vals=gexRows.map(r=>r.gex/1e6);
   const colors=vals.map(v=>v>=0?'rgba(46,160,67,.75)':'rgba(218,54,51,.75)');
   const borders=vals.map(v=>v>=0?'#2ea043':'#da3633');
   const atmIdx=labels.reduce((b,s,i)=>Math.abs(s-F)<Math.abs(labels[b]-F)?i:b,0);
 
-  // Expected range indices — fixed from open price
+  // Expected range — FIXED from first-of-day open price + first IV/DTE
   let rng=null;
-  if(Fopen&&atmIV&&dte){
-    rng=calcRange(Fopen,atmIV,dte);
+  if(Fopen&&refIV&&refDTE){
+    rng=calcRange(Fopen,refIV,refDTE);
   }
 
   if(gexChart)gexChart.destroy();
@@ -1740,11 +1794,48 @@ function decideZone(src, gexData, lv){
   let verdict, action, tagline, entry, stop, target, plan_reasons;
   const margin = scoreLong - scoreShort;
   const winnerScore = Math.max(scoreLong, scoreShort);
+  let confidenceOverride = null;
+  let winProbOverride = null;
 
-  if(winnerScore < 18 || Math.abs(margin) < 8) {
+  if(absSdPos < 1) {
+    // 🎰 BLOCK SCALP MODE — ราคาในกรอบ ±1σ จาก Open
+    // Primary $25 block (per user preference) + show $50/$100 as alternatives
+    const block = 25;
+    const halfBlk = block / 2;
+    const below = Math.floor(F / block) * block;
+    const above = below + block;
+    const mid = (below + above) / 2;
+    const recBlk = sd1d < 30 ? 25 : sd1d < 60 ? 50 : 100;
+    const b50 = {below: Math.floor(F/50)*50, above: Math.floor(F/50)*50 + 50};
+    const b100 = {below: Math.floor(F/100)*100, above: Math.floor(F/100)*100 + 100};
+    // Directional bias hint from gap
+    let biasNote = '';
+    if(futChg < -3) biasNote = ' · Gap-down → bias Long ขอบล่าง';
+    else if(futChg > 3) biasNote = ' · Gap-up → bias Short ขอบบน';
+    verdict = 'scalp';
+    action = 'BLOCK SCALP';
+    tagline = `เก็บ Block $${block}: Long $${below} / Short $${above}${biasNote}`;
+    entry = {
+      lo: below, hi: above, mid,
+      blockBelow: below, blockAbove: above, blockMid: mid,
+      blockSize: block, halfBlock: halfBlk,
+      sec50: b50, sec100: b100, recommendedBlock: recBlk
+    };
+    stop = halfBlk;     // distance (not absolute price)
+    target = halfBlk;   // distance for 1:1 (mid). Extend +block for 1:2.
+    plan_reasons = [
+      {tag:'pos', txt:`🎰 Block $${block}: Long $${below} → SL $${(below-halfBlk).toFixed(1)} / TP $${mid} (1:1) หรือ $${above} (1:2)`, score:8},
+      {tag:'pos', txt:`🎰 Block $${block}: Short $${above} → SL $${(above+halfBlk).toFixed(1)} / TP $${mid} (1:1) หรือ $${below} (1:2)`, score:8},
+      ...reasons.shared.filter(r => !r.txt.includes('No-Trade Zone'))
+    ];
+    if(recBlk !== 25) plan_reasons.unshift({tag:'warn', txt:`σ-D=$${sd1d.toFixed(0)} สูง → ลด lot หรือ พิจารณา Block $${recBlk} (Long $${recBlk===50?b50.below:b100.below} / Short $${recBlk===50?b50.above:b100.above})`, score:3});
+    if(longGammaRegime) plan_reasons.unshift({tag:'pos', txt:`Long Gamma regime — Pin มาที่ block boundary มีโอกาสสูง (~60% win)`, score:5});
+    confidenceOverride = longGammaRegime ? 55 : 35;
+    winProbOverride = longGammaRegime ? 60 : 50;
+  } else if(winnerScore < 18 || Math.abs(margin) < 8) {
     verdict = 'neutral';
-    if(absSdPos < 1) { action = 'NO TRADE'; tagline = 'ราคายังอยู่ใน No-Trade Zone (±1σ) — รอราคาทะลุ Trigger ก่อน'; }
-    else { action = 'WAIT'; tagline = 'Signals ขัดแย้งกัน — รอ confirmation เพิ่มเติม'; }
+    action = 'WAIT';
+    tagline = 'Signals ขัดแย้งกัน — รอ confirmation เพิ่มเติม';
     entry = stop = target = null;
     plan_reasons = [...reasons.shared];
   } else if(margin > 0) {
@@ -1768,8 +1859,8 @@ function decideZone(src, gexData, lv){
     target = dgc && dgc < entry.mid ? dgc : O;
     plan_reasons = [...reasons.short, ...reasons.shared];
   }
-  const confidence = Math.max(0, Math.min(100, winnerScore));
-  const winProb = verdict==='neutral' ? null : gap.rate;
+  const confidence = confidenceOverride != null ? confidenceOverride : Math.max(0, Math.min(100, winnerScore));
+  const winProb = winProbOverride != null ? winProbOverride : (verdict==='neutral' ? null : gap.rate);
   return {
     verdict, action, tagline, confidence,
     entry, stop, target, winProb,
@@ -1793,15 +1884,31 @@ function renderDecisionEngine(d, src){
 
   verdict.className = 'zde-verdict ' + d.verdict;
   actionEl.className = 'zde-action ' + d.verdict;
-  iconEl.textContent = d.verdict==='long'?'📈':d.verdict==='short'?'📉':'⏸';
-  labelEl.textContent = d.verdict==='neutral' ? 'No Edge' : 'Direction';
+  iconEl.textContent = d.verdict==='long'?'📈':d.verdict==='short'?'📉':d.verdict==='scalp'?'🎰':'⏸';
+  labelEl.textContent = d.verdict==='scalp' ? 'Block Mode' : (d.verdict==='neutral' ? 'No Edge' : 'Direction');
   actionEl.textContent = d.action;
   document.getElementById('zde-tagline').textContent = d.tagline;
   document.getElementById('zde-confnum').textContent = `${d.confidence.toFixed(0)} / 100`;
   document.getElementById('zde-confbar').style.width = `${d.confidence}%`;
 
   const fmt = (v) => v==null ? '—' : `$${v.toFixed(2)}`;
-  if(d.entry && d.stop != null && d.target != null){
+  if(d.verdict === 'scalp' && d.entry){
+    // 🎰 Block Scalp render — show both Long+Short block boundaries
+    const e = d.entry;
+    document.getElementById('zde-entry').textContent = `🟢$${e.blockBelow}  🔴$${e.blockAbove}`;
+    document.getElementById('zde-entry-sub').textContent = `Block $${e.blockSize} · Long ขอบล่าง / Short ขอบบน${e.recommendedBlock!==25?` · σ-D สูง → block $${e.recommendedBlock} ก็ใช้ได้`:''}`;
+    document.getElementById('zde-stop').textContent = `±$${e.halfBlock}`;
+    document.getElementById('zde-stop-sub').textContent = `Half-block · จาก block boundary`;
+    document.getElementById('zde-target').textContent = `$${e.blockMid} / $${e.blockSize===25?e.blockAbove:e.blockBelow}`;
+    document.getElementById('zde-target-sub').textContent = `Mid (1:1) / ตรงข้าม block (1:2)`;
+    document.getElementById('zde-rr').textContent = '1 : 1  หรือ  1 : 2';
+    document.getElementById('zde-rr').style.color = 'var(--gold-l)';
+    document.getElementById('zde-winp').textContent = d.winProb!=null ? `~${d.winProb.toFixed(0)}%` : '~55%';
+    const account = parseFloat(document.getElementById('zp-account')?.value) || 10000;
+    const riskPct = parseFloat(document.getElementById('zp-risk')?.value) || 1;
+    const lots = (account * riskPct / 100) / (e.halfBlock * 100);
+    document.getElementById('zde-lots').textContent = lots.toFixed(2);
+  } else if(d.entry && d.stop != null && d.target != null){
     const entryMid = d.entry.mid;
     document.getElementById('zde-entry').textContent = `${fmt(d.entry.lo)} - ${fmt(d.entry.hi)}`;
     document.getElementById('zde-entry-sub').textContent = `mid ${fmt(entryMid)}  (${d.verdict==='long'?'≈Put Wall':'≈Call Wall'})`;
@@ -2108,6 +2215,12 @@ async function ensureMode(mode){
       commits[mode]=today;
       if(mode===currentMode)renderSnaps(today,mode);
       await loadSnapshot(0,mode);
+      // Fetch FIRST of day = earliest commit (last index) → fixed SD reference
+      if(!firstOfDay[mode]&&today.length>0){
+        const firstIdx=today.length-1;  // newest-first list → last = earliest of day
+        const rawFirst=await fetchFileAtCommit(file,today[firstIdx].sha);
+        firstOfDay[mode]=parseGBT(rawFirst);
+      }
     }catch(e){
       row.innerHTML=`<span style="color:var(--red-l);font-size:12px;">⚠ ${e.message}</span>`;
     }
@@ -2119,7 +2232,7 @@ async function refreshData(){
   btn.classList.add('spinning');btn.disabled=true;
   commits={intraday:[],oi:[]};parsedData={intraday:null,oi:null};
   previousData={intraday:null,oi:null};currentMeta={intraday:null,oi:null};previousMeta={intraday:null,oi:null};
-  sessionIVs=[];
+  sessionIVs=[];firstOfDay={intraday:null,oi:null};
   await ensureMode(currentMode==='oi'?'oi':'intraday');
   if(currentMode==='composite'){await ensureMode('oi');await ensureMode('intraday');}
   const src=currentMode==='composite'?mergeComposite(parsedData.oi,parsedData.intraday,alpha):parsedData[currentMode];
@@ -2129,15 +2242,27 @@ async function refreshData(){
 
 // ── Zone Planner ───────────────────────────────────────
 function zpSyncFromData(src){
+  // Store current rows for vol-settle lookup in Target Move calculator
+  zpCurrentRows=src.rows;
+  zpCurrentDTE=src.dte;
+
+  // Zone Planner uses FIRST-OF-DAY price+IV (fixed SD reference, not current snapshot)
+  const modeKey=currentMode==='oi'?'oi':'intraday';
+  const ref=firstOfDay[modeKey]||src;
+  const center=ref.openPrice||ref.futuresPrice;
+  const refIV=ref.atmIV;
+  const refDTE=ref.dte;
+
   const p=document.getElementById('zp-price');
   const iv=document.getElementById('zp-iv');
   const dte=document.getElementById('zp-dte');
   const en=document.getElementById('zp-entry');
-  if(src.futuresPrice){p.value=src.futuresPrice.toFixed(2);}
-  if(src.atmIV){iv.value=src.atmIV.toFixed(2);}
-  if(src.dte){dte.value=src.dte.toFixed(2);}
+  if(center){p.value=center.toFixed(2);}
+  if(refIV){iv.value=refIV.toFixed(2);}
+  if(refDTE){dte.value=refDTE.toFixed(2);}
   if(src.futuresPrice&&!en.value){en.value=src.futuresPrice.toFixed(2);}
   zpCalc();
+  zpTargetCalc();
 }
 function zpCalc(){
   const F=parseFloat(document.getElementById('zp-price').value)||0;
@@ -2159,7 +2284,7 @@ function zpCalc(){
     {label:'+2σ',  price:F+sd2,  cls:'zone-2', desc:'Action Zone — รอ Confirmation (5%)'},
     {label:'+1σ',  price:F+sd1,  cls:'zone-1', desc:'Watch Zone — ขอบ 1SD (32%)'},
     {label:'1D +1σ',price:F+sd1d,cls:'zone-1', desc:'Daily +1σ range'},
-    {label:'OPEN', price:F,      cls:'zone-atm',desc:'ราคาเปิด / Fixed Center'},
+    {label:'OPEN', price:F,      cls:'zone-atm',desc:'ราคาเปิด / Fixed Center (ค่าตั้งต้นของ σ bands)'},
     {label:'1D −1σ',price:F-sd1d,cls:'zone-1', desc:'Daily −1σ range'},
     {label:'−1σ',  price:F-sd1,  cls:'zone-1', desc:'Watch Zone — ขอบ 1SD (32%)'},
     {label:'−2σ',  price:F-sd2,  cls:'zone-2', desc:'Action Zone — รอ Confirmation (5%)'},
@@ -2217,7 +2342,36 @@ function zpRR(){
   document.getElementById('zp-out-stop').textContent=`$${stopDist.toFixed(2)}`;
 }
 
-// ── Init ───────────────────────────────────────────────
+// ── Expected Move at Target Price ──────────────────────
+function zpTargetCalc(){
+  const targetPrice=parseFloat(document.getElementById('zp-target-price').value)||0;
+  const clearOutputs=()=>{
+    ['tm-strike','tm-vol','tm-move','tm-tp','tm-sl','tm-dte'].forEach(id=>{
+      document.getElementById(id).textContent='—';
+    });
+  };
+  if(!targetPrice){clearOutputs();return;}
+  if(!zpCurrentRows||!zpCurrentRows.length||!zpCurrentDTE){
+    document.getElementById('tm-strike').textContent='รอข้อมูล…';
+    return;
+  }
+  // Find nearest strike in data rows
+  const nearest=zpCurrentRows.reduce((b,r)=>
+    Math.abs(r.strike-targetPrice)<Math.abs(b.strike-targetPrice)?r:b, zpCurrentRows[0]);
+  const vol=nearest.volSettle;  // already decimal (e.g. 0.2712 = 27.12%)
+  if(!vol){clearOutputs();return;}
+
+  // Expected Move at target: Target × vol_settle × √(DTE/252)
+  const move=targetPrice*vol*Math.sqrt(zpCurrentDTE/252);
+
+  document.getElementById('tm-strike').textContent=`$${nearest.strike}`;
+  document.getElementById('tm-vol').textContent=`${(vol*100).toFixed(2)}%`;
+  document.getElementById('tm-dte').textContent=zpCurrentDTE.toFixed(3);
+  document.getElementById('tm-move').textContent=`±$${move.toFixed(2)}`;
+  document.getElementById('tm-tp').textContent=`$${(targetPrice+move).toFixed(2)}`;
+  document.getElementById('tm-sl').textContent=`$${(targetPrice-move).toFixed(2)}`;
+}
+
 async function init(){
   updateClock();setInterval(updateClock,30000);
   recoveryCalc();
