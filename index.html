@@ -126,6 +126,33 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-page{display:none;}
 .tab-page.active{display:block;}
 
+/* ── Squeeze Detector ── */
+.sq-regime-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+.sq-chip{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid;}
+.sq-chip.green{background:rgba(46,160,67,.15);color:var(--green-l);border-color:rgba(46,160,67,.4);}
+.sq-chip.red{background:rgba(218,54,51,.15);color:var(--red-l);border-color:rgba(218,54,51,.4);}
+.sq-chip.gold{background:rgba(210,153,34,.15);color:var(--gold-l);border-color:rgba(210,153,34,.4);}
+.sq-chip.purple{background:rgba(139,87,229,.15);color:var(--purple-l);border-color:rgba(139,87,229,.4);}
+.sq-chip.blue{background:rgba(31,111,235,.15);color:var(--blue-l);border-color:rgba(31,111,235,.4);}
+.sq-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.sq-side{border-radius:8px;padding:12px 14px;border:1px solid;}
+.sq-side.armed{background:rgba(210,153,34,.08);border-color:rgba(210,153,34,.35);}
+.sq-side.imminent{background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.55);animation:sq-pulse 1.8s ease-in-out infinite;}
+.sq-side.fired{background:rgba(218,54,51,.18);border-color:rgba(218,54,51,.8);}
+.sq-side.neutral{background:rgba(48,54,61,.5);border-color:var(--border);}
+@keyframes sq-pulse{0%,100%{box-shadow:0 0 0 0 rgba(248,81,73,0)}50%{box-shadow:0 0 0 4px rgba(248,81,73,.2)}}
+.sq-side-title{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.05em;}
+.sq-status{font-size:14px;font-weight:700;margin-bottom:10px;}
+.sq-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:5px;}
+.sq-row .sq-k{color:var(--muted);}
+.sq-row .sq-v{font-weight:700;font-family:'Fira Code',monospace;}
+.sq-target{margin-top:8px;padding:7px 10px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);}
+.sq-target-label{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.sq-target-val{font-size:16px;font-weight:700;}
+.sq-warn{background:rgba(218,54,51,.12);border:1px solid rgba(218,54,51,.45);border-radius:8px;padding:9px 14px;font-size:12px;line-height:1.6;margin-top:10px;}
+.sq-info{background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:8px;padding:9px 14px;font-size:12px;line-height:1.6;margin-top:10px;}
+.sq-airpocket{font-size:11px;color:var(--red-l);margin-top:4px;}
+
 /* ── Zone Planner ── */
 .zp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;}
 .zp-row label{font-size:12px;color:var(--muted);white-space:nowrap;}
@@ -342,6 +369,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   <button class="main-tab" onclick="switchTab('cumulative')">∑ Cumulative GEX</button>
   <button class="main-tab" onclick="switchTab('deltarange')">📐 Zone Planner</button>
   <button class="main-tab" onclick="switchTab('guide')">📖 คู่มืออ่านค่า</button>
+  <button class="main-tab" onclick="switchTab('volchart')">📈 Vol Chart</button>
 </div>
 
 <!-- GEX + Cumulative pages share controls -->
@@ -412,10 +440,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <div class="metric-value" id="m-ivrank">—</div>
       <div class="metric-sub" id="m-ivrank-sub">สูง=IV แพง ต่ำ=IV ถูก</div>
     </div>
-    <div class="metric-card">
+    <div class="metric-card" style="min-height:90px;">
       <div class="metric-label">Vol Skew (P−C)</div>
       <div class="metric-value" id="m-skew">—</div>
       <div class="metric-sub" id="m-skew-sub">+= Put แพง (Bearish hedge)</div>
+      <div id="m-skew-detail" style="font-size:10px;color:var(--muted);margin-top:3px;line-height:1.4;"></div>
     </div>
   </div>
 
@@ -524,6 +553,47 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <div class="chart-title">Key Levels</div>
       <div class="levels-grid" id="levels-grid"><div style="color:var(--muted);font-size:13px;">Loading…</div></div>
     </div>
+
+    <!-- Squeeze Detector -->
+    <div class="chart-card" id="squeeze-card">
+      <div class="chart-title" style="margin-bottom:12px;">
+        🔥 Squeeze Detector
+        <span style="font-size:10px;color:var(--muted);font-weight:400;">Gold Gamma Squeeze Briefing · Mtraders methodology</span>
+      </div>
+      <div id="squeeze-content">
+        <div style="color:var(--muted);font-size:12px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- OI vs Vol Wall Comparison -->
+    <div class="chart-card" id="wall-comp-panel" style="display:none;">
+      <div class="chart-title" style="margin-bottom:10px;">
+        ↔ OI vs Vol — Wall Comparison
+        <span style="font-size:10px;color:var(--muted);font-weight:400;">เปรียบ OI Structure vs Intraday Activity · Comp (α=<span id="wc-alpha">0.4</span>)</span>
+      </div>
+      <div id="wall-comp-table"></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;">
+        ✅ Wall ห่างกัน ≤25 pts → <strong style="color:var(--green-l);">Converged</strong> (High Conviction) · ⚠ Wall ห่างกัน >25 pts → <strong style="color:var(--gold);">Diverged</strong> (ไม่แน่ใจทิศ) · "=" = ใช้ค่าเดียวกับ OI
+      </div>
+    </div>
+
+    <!-- Composite Strike Data Table -->
+    <div class="chart-card" id="strike-table-card" style="display:none;">
+      <details class="accordion" style="border:none;background:none;padding:0;">
+        <summary style="font-size:13px;font-weight:700;color:var(--text);cursor:pointer;padding:4px 0;list-style:none;display:flex;align-items:center;gap:6px;">
+          📊 Composite Strike Data
+          <span style="font-size:10px;color:var(--muted);font-weight:400;" id="strike-table-caption">Loading…</span>
+        </summary>
+        <div style="margin-top:12px;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">
+            <strong>คอลัมน์:</strong> GEX (OI) = GEX จาก Open Interest · γ-Flow = GEX จาก Intraday Volume · Comp GEX = Blended (1−α)×OI + α×Vol ·
+            Σ Comp = Cumulative GEX สะสม · <span style="color:var(--purple-l);">✅ Block</span> = |γ-Flow/GEX_OI| ≥ 1.0 (สถาบันเปิด Position ใหม่ขนาดใหญ่)
+          </div>
+          <div id="strike-table-container" style="max-height:420px;overflow-y:auto;overflow-x:auto;"></div>
+        </div>
+      </details>
+    </div>
+
   </div>
 </div>
 
@@ -614,9 +684,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
           <input type="number" id="zp-target-price" step="0.5" placeholder="e.g. 4600" oninput="zpTargetCalc()" style="width:160px;background:var(--bg);border:1px solid var(--gold);color:var(--text);padding:6px 10px;border-radius:var(--r);font-size:13px;font-family:'Fira Code',monospace;outline:none;">
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6;">
-          สูตร: <strong style="color:var(--text);">Move = Target × Vol<sub>settle@strike</sub> × √(DTE/252)</strong><br>
-          Vol Settle ดึงจาก Strike ที่ใกล้ Target ที่สุดในข้อมูลจริง<br>
-          DTE ใช้ค่า real-time (snapshot ล่าสุด)
+          สูตร: <strong style="color:var(--text);">Move = Target × Vol<sub>settle@strike</sub> × √(DTE/365)</strong><br>
+          ใช้ Calendar Days (365) แบบ Black-76 Exact Time to Expiration<br>
+          Vol Settle ดึงจาก Strike ที่ใกล้ Target ที่สุดในข้อมูลจริง · DTE ใช้ค่า real-time
         </div>
       </div>
       <!-- Output -->
@@ -867,6 +937,70 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <p>• ราคา <strong>อยู่ต่ำกว่า Gamma Flip</strong> → Net GEX ลบ → Dealer Short Gamma → <span class="hl-red">ตลาด Trend ความผันผวนสูง</span></p>
         <div class="warn">⚠️ เมื่อราคาหลุด Gamma Flip → มักเกิด momentum รุนแรง (เหมือน "ระเบิด Gamma Bomb")</div>
         <div class="tip">💡 ใช้ Gamma Flip เป็น Key Level สำคัญ — อยู่เหนือ = ซื้อขายแบบ Range / ต่ำกว่า = ระวัง Trend</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>📐 Vol Skew (P−C) — ตลาดกลัวขึ้นหรือลง?</summary>
+      <div class="accordion-body">
+        <p><span class="hl-purple"><strong>Vol Skew</strong></span> = <strong>ราคาของความกลัว</strong> — วัดจากว่า Put (ประกันขาลง) แพงกว่า Call (ประกันขาขึ้น) มากน้อยแค่ไหน</p>
+        <div class="formula">
+          Vol Skew = IV ที่ Put −5% ATM  −  IV ที่ Call +5% ATM<br>
+          (วัดเป็น Volatility Point = vp)
+        </div>
+        <p><strong>คิดแบบง่าย:</strong> เหมือนราคาประกันรถยนต์ — ถ้าใครๆ กลัวอุบัติเหตุมาก ประกันจะแพงขึ้น Vol Skew บวกสูง = นักลงทุนกลัวราคาทองลงมาก เลยต้องจ่ายแพงซื้อ Put</p>
+
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:12px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:7px 10px;border:1px solid var(--border);">ค่า Skew</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">สัญญาณ</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">ความหมายง่ายๆ</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">กลยุทธ์</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(218,54,51,.12);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);font-weight:700;">&gt; +8 vp</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Bear Hedge สูงมาก ⚠</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">สถาบันซื้อประกันขาลงจำนวนมาก → กลัวร่วงแรง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ระวัง Short / ถ้า Long ต้อง Tight Stop</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.07);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);font-weight:700;">+4 ถึง +8 vp</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Bear Hedge สูง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">แรงกดดันขาลงมีอยู่ · Short bias ในตลาด</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Short near resistance / Long เฉพาะ bounce</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.03);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:#f0883e;font-weight:700;">+2 ถึง +4 vp</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Mild Bear Hedge</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Put แพงกว่า Call นิดหน่อย · Sideways-to-Lower</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ดูบริบท + GEX regime ประกอบ</td>
+            </tr>
+            <tr style="background:rgba(46,160,67,.03);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);font-weight:700;">−2 ถึง +2 vp</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Neutral</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Put = Call · ตลาดไม่มีทิศทางชัด · คาด Sideways</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">เล่นระหว่าง Wall / รอ breakout</td>
+            </tr>
+            <tr style="background:rgba(46,160,67,.07);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);font-weight:700;">−4 ถึง −2 vp</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Mild Bull Demand</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Call แพงกว่า Put นิดหน่อย · Upside momentum สะสม</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Long bias / ระวัง Squeeze ขาขึ้น</td>
+            </tr>
+            <tr style="background:rgba(46,160,67,.12);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);font-weight:700;">&lt; −4 vp</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Bull Demand / Squeeze ⚡</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">สถาบันซื้อ Call มาก → คาด Bullish Squeeze / Breakout</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Long aggressive / ตาม Trend ขาขึ้น</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="tip">💡 <strong>ผสมกับ GEX Regime:</strong> Skew สูงบวก + SHORT γ → ตลาดทั้ง Trend ลง + กลัวลง = อันตรายมาก ·  Skew สูงลบ + SHORT γ → Gamma Squeeze ขาขึ้นรุนแรงที่สุด</div>
+        <div class="warn">⚠ Vol Skew วัดจาก IV ±5% ATM (OTM Put vs OTM Call) — ถ้า DTE ใกล้ 0 ค่าอาจแกว่งมาก ให้ดูทิศทางรวม ไม่ใช่ตัวเลขเดี่ยว</div>
       </div>
     </details>
   </div>
@@ -1195,8 +1329,342 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       </div>
     </details>
   </div>
-</div>
+
+  <!-- ─────────────────────────────────────────────────────────── -->
+  <!-- ส่วนที่ 9 — Composite OI + Volume: อ่านสัญญาณสถาบัน       -->
+  <!-- ─────────────────────────────────────────────────────────── -->
+  <div class="guide-part">
+    <h3>🔀 ส่วนที่ 9 — Composite OI + Volume: อ่านสัญญาณสถาบัน</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:8px;">📚 Barbon &amp; Buraschi (2021) Gamma Fragility · Kolanovic &amp; Krishnamachari (2017) J.P. Morgan Big Data · CME Group (2023) Open Interest as Market Intelligence</p>
+
+    <!-- 6.1 Quadrant Analysis -->
+    <details class="accordion">
+      <summary>📊 Quadrant Analysis — อ่าน OI + Volume แบบมืออาชีพ</summary>
+      <div class="accordion-body">
+        <p>การอ่านสัญญาณสถาบันต้องแยกแยะ <span class="hl-gold"><strong>"พลังงานชั่วคราว"</strong> (Volume)</span> ออกจาก <span class="hl-green"><strong>"ภาระผูกพันจริง"</strong> (OI)</span></p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:7px 10px;text-align:left;border:1px solid var(--border);">สถานการณ์</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);">ราคา</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);">Volume</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);">OI</th>
+              <th style="padding:7px 10px;text-align:left;border:1px solid var(--border);">ความหมาย</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(46,160,67,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);font-weight:700;">Long Buildup</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">↑ ขึ้น</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">สูง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;color:var(--green-l);">↑ เพิ่ม</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">🟢 <strong>กระทิงแข็งแกร่ง:</strong> เงินใหม่ไหลเข้าจริง</td>
+            </tr>
+            <tr style="background:rgba(240,136,62,.06);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--gold);font-weight:700;">Short Covering</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">↑ ขึ้น</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">สูง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;color:var(--red-l);">↓ ลด</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">⚠ <strong>กระทิงอ่อนแอ:</strong> แค่ Short ปิดสถานะ (กับดัก)</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);font-weight:700;">Short Buildup</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">↓ ลง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">สูง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;color:var(--green-l);">↑ เพิ่ม</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">🔴 <strong>หมีแข็งแกร่ง:</strong> แรงขายจริงจากสถาบัน</td>
+            </tr>
+            <tr style="background:rgba(240,136,62,.06);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--gold);font-weight:700;">Long Liquidation</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">↓ ลง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;">สูง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);text-align:center;color:var(--red-l);">↓ ลด</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">⚠ <strong>หมีอ่อนแรง:</strong> แค่ Long ทำกำไร (Weak conviction)</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip">💡 <strong>Confluence Signal ที่น่าเชื่อถือที่สุด:</strong> Breakout + Volume Surge + OI เพิ่ม พร้อมกัน → Institutional Smart Money กำลัง Drive Move นั้น</div>
+        <p style="margin-top:10px;"><span class="hl-purple"><strong>สูตร Composite Score (α-blending)</strong></span></p>
+        <div class="formula">
+          Composite_GEX = (1 − α) × GEX_OI + α × γFlow_Volume<br><br>
+          α = 0   → ดูเฉพาะ OI (ตำแหน่งสะสม ระยะยาว)<br>
+          α = 0.4 → <strong>แนะนำสำหรับทองคำ</strong> (60% OI + 40% Volume)<br>
+          α = 1   → ดูเฉพาะ Volume (กิจกรรมวันนี้เท่านั้น)
+        </div>
+      </div>
+    </details>
+
+    <!-- 6.2 Block Trade Detection -->
+    <details class="accordion">
+      <summary>🟣 Block Trade Detection + TP/SL — จับสัญญาณสถาบัน</summary>
+      <div class="accordion-body">
+        <p><span class="hl-purple"><strong>Block Trade</strong></span> = การซื้อขาย Options ปริมาณมากในคราวเดียว ที่ <strong>ไม่สมดุลกับ OI ที่มีอยู่</strong> สัญญาณว่า Institutional Player กำลัง Build หรือ Unwind Position ขนาดใหญ่</p>
+        <div class="formula">
+          เกณฑ์ตรวจจับ: Ratio = |γ-Flow (Vol)| ÷ |GEX (OI)| ≥ 1.0×<br><br>
+          เมื่อ Intraday GEX ≥ Structural OI GEX ที่ Strike เดียวกัน<br>
+          → มีการซื้อขายใหม่ในสัดส่วน 1:1 กับ OI ที่มีอยู่<br>
+          → สัญญาณ Opening Block Trade (Smart Money สร้างฐานใหม่)
+        </div>
+        <p style="margin-top:12px;"><strong>TP/SL ตาม GEX Regime:</strong></p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:8px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:7px 10px;border:1px solid var(--border);">Regime</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">กลยุทธ์</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">TP Long</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">TP Short</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">SL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(46,160,67,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);font-weight:700;">LONG γ</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Mean-Reversion</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);">+Wall (Call Wall)</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);">−Wall (Put Wall)</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);">Composite Flip</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);font-weight:700;">SHORT γ</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Trend-Follow</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);">Upper 3σ</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);">Lower 3σ</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);">Composite Flip / Center</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip">💡 <strong>LONG γ</strong>: Dealer กดราคากลับ → fade direction, TP ที่ Wall, SL ที่ Flip<br>💡 <strong>SHORT γ</strong>: Dealer ถูกบีบตาม → follow trend, TP ที่ 3σ, SL ที่ Center</div>
+        <div class="warn">⚠ Ratio ยิ่งสูง ยิ่งเป็น Kill Zone — Dealer ต้องปกป้องระดับนั้นอย่างถวายหัว</div>
+        <div class="formula" style="margin-top:10px;">
+          Position Sizing (Rule of 16):<br>
+          Risk Per Trade = Account × 1%<br>
+          Lot = Risk / Stop_Distance_$
+        </div>
+      </div>
+    </details>
+
+    <!-- 6.3 Convergence Analysis -->
+    <details class="accordion">
+      <summary>✅ Convergence Analysis — ยืนยันแนวรับ/ต้าน</summary>
+      <div class="accordion-body">
+        <p>Convergence ตรวจว่า <span class="hl-green">Wall จาก OI</span> และ <span class="hl-blue">Wall จาก Volume</span> อยู่ใกล้กันหรือไม่</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:7px 10px;border:1px solid var(--border);">สถานะ</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">เกณฑ์</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">ความหมาย</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(46,160,67,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);font-weight:700;">✅ Converged</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ห่างกัน ≤ 25 จุด</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">แนวรับ/ต้าน <strong>น่าเชื่อถือสูง</strong> (High Conviction) — OI + Volume ชี้ตรงกัน</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--gold);font-weight:700;">⚠ Diverged</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ห่างกัน &gt; 25 จุด</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">แนวรับ/ต้าน <strong>ไม่แน่นอน</strong> — ตลาดยังไม่ตกลงกัน</td>
+            </tr>
+          </tbody>
+        </table>
+        <p><strong>ตรรกะ:</strong> OI = ตำแหน่งเก่า (ระยะยาว) · Volume = กิจกรรมวันนี้ (ระยะสั้น)</p>
+        <p><strong>นัยเชิงกลยุทธ์:</strong></p>
+        <p>
+          • หากเกิดที่ <strong>Call Wall</strong>: แนวต้านที่ผ่านยากที่สุด → ถ้าผ่านได้ = Gamma Squeeze รุนแรง<br>
+          • หากเกิดที่ <strong>Put Wall</strong>: แนวรับหนาแน่นที่สุด → ถ้าหลุด = ความเสียหายรุนแรงมาก
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:7px 10px;border:1px solid var(--border);">Composite Net GEX</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">ระบอบ</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);">กลยุทธ์</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(46,160,67,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--green-l);">&gt; 0</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">LONG γ — Mean-Revert</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ขายที่ +Wall · ซื้อที่ −Wall หรือ Flip</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.08);">
+              <td style="padding:6px 10px;border:1px solid var(--border);color:var(--red-l);">&lt; 0</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">SHORT γ — Trend-Follow</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ตามเทรนด์ · หลีกเลี่ยง Counter-trend</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip">💡 ใช้ α=0.4 (Composite) เพื่อให้เห็น Convergence ระหว่าง OI structure กับ Intraday sentiment พร้อมกัน</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Part 10 -->
+  <div class="guide-part">
+    <h3>📊 ส่วนที่ 10 — Composite Strike Data & OI vs Vol Wall Comparison</h3>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:8px;">สองแผงนี้อยู่ใน Tab "GBT Analysis" · ต้องโหลดทั้ง OI + Intraday Volume เพื่อดูแบบ Composite</p>
+
+    <details class="accordion">
+      <summary>📋 Composite Strike Data — อ่านตารางรายระดับราคา</summary>
+      <div class="accordion-body">
+        <p><strong>ตารางนี้แสดงอะไร?</strong><br>ทุก Strike Price จะมีข้อมูลแบ่งออกเป็นชั้น OI (Open Interest = ตำแหน่งสะสม) และ Volume (กิจกรรมวันนี้) รวมถึงค่า Composite ที่ผสมทั้งสอง</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:6px 10px;border:1px solid var(--border);">คอลัมน์</th>
+              <th style="padding:6px 10px;border:1px solid var(--border);">ความหมาย</th>
+              <th style="padding:6px 10px;border:1px solid var(--border);">อ่านยังไง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;">Call OI / Put OI</td><td style="padding:6px 10px;border:1px solid var(--border);">จำนวน Contract ที่เปิดค้างอยู่</td><td style="padding:6px 10px;border:1px solid var(--border);">สูง = สถาบัน/ใหญ่ถือตำแหน่งนั้น</td></tr>
+            <tr><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;">Call Vol / Put Vol</td><td style="padding:6px 10px;border:1px solid var(--border);">ปริมาณ Contract ที่ซื้อขายวันนี้</td><td style="padding:6px 10px;border:1px solid var(--border);">สูง = กิจกรรมวันนี้ Active</td></tr>
+            <tr style="background:rgba(46,160,67,.06);"><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;color:var(--green-l);">GEX (OI)</td><td style="padding:6px 10px;border:1px solid var(--border);">Gamma Exposure จาก OI — แรงของ Dealer ที่สะสมมา</td><td style="padding:6px 10px;border:1px solid var(--border);">บวก = Dealer ดูดราคากลับ · ลบ = Dealer ดันราคาออก</td></tr>
+            <tr style="background:rgba(137,87,229,.06);"><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;color:var(--purple-l);">γ-Flow</td><td style="padding:6px 10px;border:1px solid var(--border);">Gamma Flow จาก Volume วันนี้ — "แรงกระแทก" ที่เพิ่งเกิด</td><td style="padding:6px 10px;border:1px solid var(--border);">บวก/ลบ = ทิศทาง Flow วันนี้ · ขนาดใหญ่ = แรง</td></tr>
+            <tr><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;">Comp GEX</td><td style="padding:6px 10px;border:1px solid var(--border);">ค่าผสม = 60% OI + 40% Volume (α=0.4)</td><td style="padding:6px 10px;border:1px solid var(--border);">ค่ารวมที่สมดุลระหว่างระยะยาว + วันนี้</td></tr>
+            <tr><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;">Σ Comp</td><td style="padding:6px 10px;border:1px solid var(--border);">ผลรวมสะสมของ Comp GEX ตั้งแต่ Strike ต่ำสุดขึ้นมา</td><td style="padding:6px 10px;border:1px solid var(--border);">เปลี่ยนเครื่องหมาย = Gamma Flip Point</td></tr>
+            <tr style="background:rgba(137,87,229,.06);"><td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;color:var(--purple-l);">✅ Block</td><td style="padding:6px 10px;border:1px solid var(--border);">|γ-Flow / GEX_OI| ≥ 1.0 × (Ratio ที่แสดง)</td><td style="padding:6px 10px;border:1px solid var(--border);">สถาบันเปิดตำแหน่งใหม่มากเท่ากับ OI เดิมหรือมากกว่า → "Kill Zone"</td></tr>
+          </tbody>
+        </table>
+        <div class="tip">💡 <strong>แถวสีทอง</strong> = ATM (ราคาปัจจุบัน) · <strong>แถวสีม่วง</strong> = Block Trade Strike · ดูว่า Block Trade อยู่ฝั่งใด → บอกทิศทาง Institutional Flow</div>
+        <div class="warn">⚠ ต้องโหลดทั้ง OI Mode และ Intraday Mode ก่อน ถึงจะเห็นข้อมูล Composite ครบถ้วน — ลอง Switch ไป Composite Mode</div>
+      </div>
+    </details>
+
+    <details class="accordion">
+      <summary>↔ OI vs Vol Wall Comparison — เปรียบแนวรับ/ต้านสองชั้น</summary>
+      <div class="accordion-body">
+        <p><strong>ทำไมต้องเปรียบ OI กับ Volume?</strong><br>
+        OI = กำแพง "ถาวร" ที่สร้างจากตำแหน่งสะสม → เปลี่ยนช้า<br>
+        Volume = กำแพง "ชั่วคราว" ที่เกิดจากกิจกรรมวันนี้ → เปลี่ยนเร็ว</p>
+        <p>เมื่อ Wall ของ OI กับ Volume <strong>ตรงกัน (Converged)</strong> → กำแพงนั้น <span class="hl-green">แน่นมาก ทะลุยาก</span><br>
+        เมื่อ Wall <strong>ไม่ตรงกัน (Diverged)</strong> → กำแพงอ่อน สัญญาณส่ง Mixed</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;">
+          <thead>
+            <tr style="background:var(--surface2);color:var(--muted);">
+              <th style="padding:6px 10px;border:1px solid var(--border);">แถว</th>
+              <th style="padding:6px 10px;border:1px solid var(--border);">ความหมาย</th>
+              <th style="padding:6px 10px;border:1px solid var(--border);">ใช้ยังไง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:rgba(46,160,67,.06);">
+              <td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;color:var(--green-l);">+GEX Wall (Resistance)</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Strike ที่ Dealer ต้องขาย Futures เยอะที่สุด เมื่อราคาขึ้นไปถึง</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ถ้า OI=Vol (Converged) → แนวต้านแกร่งมาก · TP สำหรับ Long</td>
+            </tr>
+            <tr style="background:rgba(218,54,51,.06);">
+              <td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;color:var(--red-l);">−GEX Wall (Support)</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Strike ที่ Dealer ต้องขาย Futures เมื่อราคาลงมาถึง (ยิ่งลง)</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">ถ้า OI=Vol (Converged) → แนวรับแน่น แต่ถ้าหลุด = ร่วงหนัก</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;">Flip Point</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">จุดที่ Gamma Regime เปลี่ยนจาก Long → Short หรือกลับกัน</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">อยู่เหนือ Flip = Mean-Revert · ต่ำกว่า Flip = Trend ตาม</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px;border:1px solid var(--border);font-weight:700;">GTBR Daily / Expiry</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">Gamma Trading Band Range — ช่วงราคาที่คาดว่าจะอยู่ใน</td>
+              <td style="padding:6px 10px;border:1px solid var(--border);">"=" = Vol ใช้ค่าเดียวกับ OI (IV มาจากแหล่งเดียวกัน)</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip">💡 ตรวจ Convergence ก่อนเทรดทุกครั้ง — ถ้า +Wall Converged และราคาใกล้ +Wall → TP เลยกว่าผ่านยาก ถ้า Diverged → ระวัง False Breakout</div>
+      </div>
+    </details>
+  </div>
+
+</div><!-- end guide-section -->
 </div><!-- end tab-guide -->
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 5 — Vol Chart  (CME-style + TradingView XAUUSD)
+═══════════════════════════════════════════════════════ -->
+<div id="tab-volchart" class="tab-page">
+<div style="padding:16px 20px;">
+
+  <!-- ── Commit selector ── -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+    <span style="font-size:12px;color:var(--muted);font-weight:700;">SNAPSHOT (Intraday):</span>
+    <div id="vc-commit-row" class="snapshot-row" style="flex:1;">
+      <span style="color:var(--muted);font-size:12px;">—</span>
+    </div>
+  </div>
+
+  <!-- ── CME-style Vol Chart ── -->
+  <div class="chart-card">
+    <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>📊 Intraday Volume — Put / Call bars · Vol Settle line · Δ Zones</span>
+      <span id="vc-header-meta" style="font-size:11px;color:var(--muted);font-weight:400;"></span>
+    </div>
+    <div style="position:relative;height:340px;">
+      <canvas id="vcChart"></canvas>
+    </div>
+    <!-- Delta zone legend -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:10px;color:var(--muted);">
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:rgba(88,166,255,0.25);border-radius:2px;display:inline-block;"></span>5Δ–15Δ zone</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:rgba(88,166,255,0.15);border-radius:2px;display:inline-block;"></span>15Δ–25Δ zone</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:rgba(88,166,255,0.08);border-radius:2px;display:inline-block;"></span>25Δ–35Δ zone</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:rgba(88,166,255,0.04);border-radius:2px;display:inline-block;"></span>35Δ–45Δ zone</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:2px;height:10px;background:rgba(210,153,34,0.8);border-radius:1px;display:inline-block;"></span>ATM (F)</span>
+    </div>
+  </div>
+
+  <!-- ── Metrics row: Futures / Spot / Diff + SD levels ── -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--border);margin-top:12px;border-radius:var(--r);overflow:hidden;">
+    <div class="metric-card">
+      <div class="metric-label">GC Futures</div>
+      <div class="metric-value val-gold" id="vc-futures">—</div>
+      <div class="metric-sub" id="vc-futures-sub">From CME data</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">XAUUSD Spot</div>
+      <div class="metric-value" id="vc-spot">—</div>
+      <div class="metric-sub" id="vc-spot-sub">Fetching…</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Futures − Spot (Basis)</div>
+      <div class="metric-value" id="vc-diff">—</div>
+      <div class="metric-sub" id="vc-diff-sub">Contango (+) / Backwardation (−)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">1σ Range (DTE)</div>
+      <div class="metric-value val-blue" id="vc-1sd">—</div>
+      <div class="metric-sub" id="vc-1sd-sub">Upper / Lower</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">2σ Range (DTE)</div>
+      <div class="metric-value val-purple" id="vc-2sd">—</div>
+      <div class="metric-sub" id="vc-2sd-sub">Upper / Lower</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">1σ Daily Range</div>
+      <div class="metric-value val-green" id="vc-1dd">—</div>
+      <div class="metric-sub" id="vc-1dd-sub">±$ per day</div>
+    </div>
+  </div>
+
+  <!-- ── SD Levels + Round Numbers reference ── -->
+  <div class="chart-card" style="margin-top:12px;">
+    <div class="chart-title">📐 SD Price Levels &amp; Round Numbers</div>
+    <div id="vc-sd-table" style="overflow-x:auto;"></div>
+  </div>
+
+  <!-- ── TradingView XAUUSD ── -->
+  <div class="chart-card" style="margin-top:12px;">
+    <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>📈 XAUUSD — TradingView <span style="font-size:10px;font-weight:400;color:var(--muted);">(CME SD bands แสดงในตารางด้านบน · ลากเส้นเองบน chart)</span></span>
+    </div>
+    <div class="tradingview-widget-container" style="height:500px;width:100%;">
+      <div id="tradingview_xauusd" style="height:100%;width:100%;"></div>
+    </div>
+  </div>
+
+</div><!-- /padding -->
+</div><!-- end tab-volchart -->
 
 <script>
 // ── State ──────────────────────────────────────────────
@@ -1210,7 +1678,9 @@ let currentMeta={intraday:null,oi:null};    // {sha, date} of current snapshot
 let gexChart=null, cumChart=null;
 let currentTab='gex';
 let sessionIVs=[];        // ATM IV across snapshots for IV Rank
-let firstOfDay={intraday:null,oi:null};  // earliest snapshot of the session → fixed SD reference
+let firstOfDay={intraday:null,oi:null};  // earliest snapshot of the session → Zone Planner reference
+let sdAnchor={intraday:null,oi:null};   // SD zone reference — resets every 3 hours
+let sdAnchorTime={intraday:0,oi:0};    // ms timestamp of last sdAnchor update
 let zpCurrentRows=null;   // rows from latest snapshot for vol settle lookup
 let zpCurrentDTE=null;    // current DTE for target-move calc
 
@@ -1218,14 +1688,21 @@ let zpCurrentDTE=null;    // current DTE for target-move calc
 function switchTab(tab) {
   currentTab=tab;
   document.querySelectorAll('.main-tab').forEach((b,i)=>{
-    const tabs=['gex','cumulative','deltarange','guide'];
+    const tabs=['gex','cumulative','deltarange','guide','volchart'];
     b.classList.toggle('active',tabs[i]===tab);
   });
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
-  const hideControls=tab==='guide'||tab==='deltarange';
+  const hideControls=tab==='guide'||tab==='deltarange'||tab==='volchart';
   document.getElementById('chart-controls').style.display=hideControls?'none':'block';
   if(tab==='cumulative'&&parsedData[currentMode]) renderCumulative();
+  if(tab==='volchart'){
+    populateVCCommits();
+    const src=parsedData.intraday;
+    if(src){renderVolChart(src);updateVCMetrics(src);}
+    initTVWidget();
+    fetchSpotPrice();
+  }
 }
 
 // ── Setup ──────────────────────────────────────────────
@@ -1361,12 +1838,21 @@ function mergeComposite(oiParsed,volParsed,a){
 
 // ── Key Levels ─────────────────────────────────────────
 function calcLevels(rows,F){
-  const callWall=rows.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null});
-  const putWall=rows.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null});
-  const above=rows.filter(r=>r.strike>=F),below=rows.filter(r=>r.strike<F);
+  // Call Wall: max positive GEX among strikes AT or ABOVE current price
+  // Put Wall:  max negative GEX among strikes AT or BELOW current price
+  // This ensures Call squeeze always means "price goes UP" and Put squeeze means "price goes DOWN"
+  const above=rows.filter(r=>r.strike>=F), below=rows.filter(r=>r.strike<=F);
+  const callWall = above.length
+    ? above.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null})
+    : rows.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null}); // fallback: global max
+  const putWall = below.length
+    ? below.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null})
+    : rows.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null}); // fallback: global min
+  // Gamma flip lines (zero-crossing nearest to ATM)
+  const aboveFlip=rows.filter(r=>r.strike>=F), belowFlip=rows.filter(r=>r.strike<F);
   let flipAbove=null,flipBelow=null;
-  for(let i=0;i<above.length-1;i++)if(above[i].gex*above[i+1].gex<=0){flipAbove=above[i];break;}
-  for(let i=below.length-1;i>0;i--)if(below[i].gex*below[i-1].gex<=0){flipBelow=below[i];break;}
+  for(let i=0;i<aboveFlip.length-1;i++)if(aboveFlip[i].gex*aboveFlip[i+1].gex<=0){flipAbove=aboveFlip[i];break;}
+  for(let i=belowFlip.length-1;i>0;i--)if(belowFlip[i].gex*belowFlip[i-1].gex<=0){flipBelow=belowFlip[i];break;}
   const dgcWall=callWall.strike&&putWall.strike?(callWall.strike+putWall.strike)/2:null;
   return{callWall,putWall,flipAbove,flipBelow,dgcWall};
 }
@@ -1400,9 +1886,9 @@ function updateMetrics(parsed,totalGex){
   document.getElementById('m-gex').className=`metric-value ${gM>=0?'val-green':'val-red'}`;
   document.getElementById('m-gex-bias').textContent=gM>0?'Long Gamma — ตลาด Mean-Revert':'Short Gamma — ระวัง Trending';
 
-  // Use first-of-day snapshot for FIXED SD (same as CME's fixed morning reference)
+  // Use 3-hour SD anchor (updates every 3h, not fixed to session open)
   const modeKey=currentMode==='oi'?'oi':'intraday';
-  const ref=firstOfDay[modeKey]||parsed;
+  const ref=sdAnchor[modeKey]||parsed;
   const Fopen=ref.openPrice||ref.futuresPrice||F;
   const refIV=ref.atmIV||atmIV;
   const refDTE=ref.dte||dte;
@@ -1416,7 +1902,10 @@ function updateMetrics(parsed,totalGex){
     document.getElementById('rb-2exp').textContent=`${rng.lo2.toFixed(2)}–${rng.hi2.toFixed(2)}`;
     document.getElementById('rb-1day').textContent=`${rng.lo1d.toFixed(2)}–${rng.hi1d.toFixed(2)}`;
     const openEl=document.getElementById('rb-open-label');
-    if(openEl)openEl.textContent=`Open: $${Fopen.toFixed(2)} | 1σ=±$${rng.r1exp.toFixed(2)}`;
+    if(openEl){
+      const anchorBKK=sdAnchorTime[modeKey]>0?fmtTimeBKK(new Date(sdAnchorTime[modeKey]).toISOString()):'—';
+      openEl.textContent=`Ref: $${Fopen.toFixed(2)} IV:${refIV?.toFixed(1)}% | Anchor updated ${anchorBKK} BKK`;
+    }
   }
 }
 function updateLevels(lv,F){
@@ -1439,7 +1928,7 @@ function updateLevels(lv,F){
 function renderGEX(parsed,gexRows,totalGex){
   const{futuresPrice:F}=parsed;
   const modeKey=currentMode==='oi'?'oi':'intraday';
-  const ref=firstOfDay[modeKey]||parsed;
+  const ref=sdAnchor[modeKey]||parsed;
   const Fopen=ref.openPrice||ref.futuresPrice||F;
   const refIV=ref.atmIV||parsed.atmIV;
   const refDTE=ref.dte||parsed.dte;
@@ -1449,7 +1938,7 @@ function renderGEX(parsed,gexRows,totalGex){
   const borders=vals.map(v=>v>=0?'#2ea043':'#da3633');
   const atmIdx=labels.reduce((b,s,i)=>Math.abs(s-F)<Math.abs(labels[b]-F)?i:b,0);
 
-  // Expected range — FIXED from first-of-day open price + first IV/DTE
+  // Expected range — from 3-hour SD anchor (IV + DTE reset every 3h)
   let rng=null;
   if(Fopen&&refIV&&refDTE){
     rng=calcRange(Fopen,refIV,refDTE);
@@ -1516,14 +2005,15 @@ function renderGEX(parsed,gexRows,totalGex){
         c.strokeStyle='#d29922';c.lineWidth=2;c.setLineDash([6,3]);
         c.beginPath();c.moveTo(ax,top);c.lineTo(ax,bottom);c.stroke();
         c.setLineDash([]);
-        c.fillStyle='#d29922';c.fillRect(ax-28,top,56,16);
+
         c.fillStyle='#000';c.font='bold 10px system-ui';c.textAlign='center';
-        c.fillText(`ATM ${F?F.toFixed(2):''}`,ax,top+11);
+        c.fillText(`ATM ${F?F.toFixed(0):''}`,ax,top+11);
         c.restore();
       }
     }]
   });
 }
+
 
 // ── Cumulative GEX Chart ───────────────────────────────
 function renderCumulative(){
@@ -1607,6 +2097,7 @@ function renderCumulative(){
     }]
   });
 
+  // Flip analysis
   const netGex=gexData.totalGex/1e6;
   const aboveFlip=F&&flipStrike?F>flipStrike:null;
   document.getElementById('flip-analysis').innerHTML=`
@@ -1636,6 +2127,8 @@ function renderCumulative(){
     </div>`;
 }
 
+
+
 // ── IV Rank ────────────────────────────────────────────
 function updateIVRank(currentIV){
   if(currentIV>0&&!sessionIVs.includes(currentIV))sessionIVs.push(currentIV);
@@ -1651,10 +2144,14 @@ function updateIVRank(currentIV){
 }
 
 // ── Vol Skew ───────────────────────────────────────────
+// Skew = OTM Put IV − OTM Call IV (±5% from ATM)
+// Positive = Put แพงกว่า Call  → ตลาดกลัวราคาลง (Bear hedge)
+// Negative = Call แพงกว่า Put  → ตลาดคาดราคาขึ้น (Bull demand)
 function updateSkew(rows,F,atmIV){
   const el=document.getElementById('m-skew');
   const sub=document.getElementById('m-skew-sub');
-  if(!rows||!F||!atmIV){el.textContent='—';return;}
+  const det=document.getElementById('m-skew-detail');
+  if(!rows||!F||!atmIV){el.textContent='—';if(sub)sub.textContent='';if(det)det.textContent='';return;}
   const delta=F*0.05;
   const putTarget=F-delta, callTarget=F+delta;
   const putRow=rows.reduce((b,r)=>Math.abs(r.strike-putTarget)<Math.abs(b.strike-putTarget)?r:b,rows[0]);
@@ -1663,7 +2160,33 @@ function updateSkew(rows,F,atmIV){
   const skew=(putRow.volSettle-callRow.volSettle)*100;
   el.textContent=`${skew>=0?'+':''}${skew.toFixed(2)} vp`;
   el.className=`metric-value ${skew>2?'val-red':skew<-2?'val-green':'val-n'}`;
-  sub.textContent=skew>2?`+Put premium (Bear hedge ↑)`:skew<-2?`+Call premium (Bull demand ↑)`:`Neutral Skew`;
+
+  // ── Label + plain-language explanation ─────────────
+  let label='', detail='';
+  if(skew>8){
+    label='+Put premium — Bear Hedge สูงมาก ⚠';
+    detail='สถาบันซื้อ Put จำนวนมาก → กลัวราคาร่วงแรง · Dealer ต้องขาย Futures hedge → แรงกด Down';
+  } else if(skew>4){
+    label='+Put premium — Bear Hedge สูง';
+    detail='มีแรงซื้อประกันขาลงชัดเจน · ตลาดคาดแกว่งลงมากกว่าขึ้น · ระวังเมื่อราคาใกล้ Put Wall';
+  } else if(skew>2){
+    label='+Put premium — Bear Hedge ↑';
+    detail='Put แพงกว่า Call เล็กน้อย · สัญญาณป้องกัน Downside · Sideways-to-Lower bias';
+  } else if(skew>=-2){
+    label='Neutral Skew — ไม่มีทิศทางชัดเจน';
+    detail='Put กับ Call ราคาพอๆ กัน · ตลาดยังไม่ตัดสินใจ · คาด Sideways ระหว่าง Wall';
+  } else if(skew>=-4){
+    label='+Call premium — Bull Demand ↑';
+    detail='Call แพงกว่า Put เล็กน้อย · Upside momentum สะสม · ระวัง Squeeze ขาขึ้น';
+  } else if(skew>=-8){
+    label='+Call premium — Bull Demand สูง';
+    detail='สถาบันซื้อ Call ชัดเจน · คาด Breakout ขาขึ้น · Dealer ต้องซื้อ Futures hedge → แรงดัน Up';
+  } else {
+    label='+Call premium — Bull Squeeze ⚡';
+    detail='สถาบันสะสม Call จำนวนมาก → คาด Gamma Squeeze ขาขึ้นรุนแรง · ตามเทรนด์ Aggressive';
+  }
+  if(sub)sub.textContent=label;
+  if(det)det.textContent=detail;
 }
 
 // ── Decision Engine helpers ────────────────────────────
@@ -1710,412 +2233,458 @@ function decideZone(src, gexData, lv){
   const absSdPos = Math.abs(sdPos);
 
   let quadrant, quadrantNote;
-  if(futChg > 1 && ivChg > 0)       { quadrant='Long Buildup / Vanna Risk'; quadrantNote='Price↑+IV↑ → Dealer chase (Gold squeeze fuel)'; }
-  else if(futChg > 1 && ivChg <= 0) { quadrant='Healthy Drift';              quadrantNote='Price↑+IV↓ → Vol Crush, news priced in'; }
-  else if(futChg < -1 && ivChg > 0) { quadrant='Panic / Short Buildup';      quadrantNote='Price↓+IV↑ → Real fear, hedging demand'; }
-  else if(futChg < -1 && ivChg <= 0){ quadrant='Long Liquidation';           quadrantNote='Price↓+IV↓ → Stops cleared, not new trend'; }
-  else                              { quadrant='Neutral';                    quadrantNote='No directional bias yet'; }
 
-  let timeWarn = null;
-  try {
-    const bkk = nowBKK();
-    if(bkk.getDay() === 5 && bkk.getHours() >= 20) timeWarn = 'Friday late — Charm unwind, range +15-20%';
-    else if(bkk.getDay() === 5) timeWarn = 'Friday — wider range expected';
-  } catch(e) {}
-
-  const reasons = { long:[], short:[], shared:[] };
-  let scoreLong = 0, scoreShort = 0;
-
-  if(absSdPos < 1) {
-    reasons.shared.push({tag:'warn', txt:`ราคาอยู่ใน No-Trade Zone (${absSdPos.toFixed(2)}σ จาก Open) — Edge ต่ำ`, score:-10});
-    scoreLong -= 10; scoreShort -= 10;
-  } else if(absSdPos < 2) {
-    if(sdPos < 0) { reasons.long.push({tag:'pos', txt:`ราคาทะลุ DOWN Trigger ลงมาในโซน Action (−${absSdPos.toFixed(2)}σ)`, score:18}); scoreLong += 18; }
-    else          { reasons.short.push({tag:'pos', txt:`ราคาทะลุ UP Trigger ขึ้นในโซน Action (+${absSdPos.toFixed(2)}σ)`, score:18}); scoreShort += 18; }
+  // Quadrant determination (which SD zone are we in)
+  if(longGammaRegime){
+    if(absSdPos < 0.5){
+      quadrant='neutral'; quadrantNote='ราคาอยู่ใน Neutral Zone (±0.5σ) · Long Gamma Regime → mean-revert ได้';
+    } else if(sdPos >= 0.5 && sdPos < 1.0){
+      quadrant='upper_watch'; quadrantNote='ราคาเข้าใกล้ +1σ · รอ Call Wall ยืนยัน → Fade หรือ รอ Break';
+    } else if(sdPos >= 1.0){
+      quadrant='upper_action'; quadrantNote='ราคาทะลุ +1σ · Long Gamma → ดีลเลอร์ขาย → Fade โอกาสสูง';
+    } else if(sdPos <= -0.5 && sdPos > -1.0){
+      quadrant='lower_watch'; quadrantNote='ราคาเข้าใกล้ −1σ · Put Wall ใกล้ → รอยืนยัน';
+    } else {
+      quadrant='lower_action'; quadrantNote='ราคาทะลุ −1σ · Long Gamma → ดีลเลอร์ซื้อ → Fade โอกาสสูง';
+    }
   } else {
-    if(sdPos < 0) { reasons.long.push({tag:'pos', txt:`ราคาอยู่ในโซน Extreme (−${absSdPos.toFixed(2)}σ) — Reversion สูง`, score:22}); scoreLong += 22; }
-    else          { reasons.short.push({tag:'pos', txt:`ราคาอยู่ในโซน Extreme (+${absSdPos.toFixed(2)}σ) — Reversion สูง`, score:22}); scoreShort += 22; }
+    if(absSdPos < 0.5){
+      quadrant='neutral_neg'; quadrantNote='Neutral Zone · Short Gamma → ระวัง ตลาดอาจ vol ได้';
+    } else if(sdPos > 0){
+      quadrant='upper_trend'; quadrantNote='Short Gamma Uptrend → Dealer ซื้อตาม → Momentum ขึ้น';
+    } else {
+      quadrant='lower_trend'; quadrantNote='Short Gamma Downtrend → Dealer ขายตาม → Momentum ลง';
+    }
   }
 
-  const gap = gapFillBucket(Math.abs(futChg));
-  if(absSdPos > 0.3) {
-    if(futChg < 0) { reasons.long.push({tag:gap.score>0?'pos':'neg', txt:`Gap ${gap.label} → ${gap.rate}% fill rate (${gap.note})`, score:gap.score}); scoreLong += gap.score; }
-    else if(futChg > 0) { reasons.short.push({tag:gap.score>0?'pos':'neg', txt:`Gap ${gap.label} → ${gap.rate}% fill rate (${gap.note})`, score:gap.score}); scoreShort += gap.score; }
+  let score=50; const reasons=[];
+  if(longGammaRegime){score+=10;reasons.push({icon:'🟢',text:`Long Gamma (Net GEX +${totalGex.toFixed(1)}M) → ตลาดดูดราคากลับ`});}
+  else{score-=10;reasons.push({icon:'🔴',text:`Short Gamma (Net GEX ${totalGex.toFixed(1)}M) → ตลาดดันราคาต่อ`});}
+  if(cw&&F<cw) reasons.push({icon:'🟡',text:`Call Wall $${cw} ห่าง +$${(cw-F).toFixed(0)}`});
+  if(pw&&F>pw) reasons.push({icon:'🟡',text:`Put Wall $${pw} ห่าง −$${(F-pw).toFixed(0)}`});
+  if(ivChg&&Math.abs(ivChg)>0.5){
+    if(ivChg>0){score-=5;reasons.push({icon:'🔺',text:`IV เพิ่ม ${ivChg.toFixed(2)}% → risk ↑`});}
+    else{score+=5;reasons.push({icon:'🔻',text:`IV ลด ${Math.abs(ivChg).toFixed(2)}%`});}
   }
+  reasons.push({icon:'📏',text:`ราคาอยู่ที่ ${sdPos>=0?'+':''}${sdPos.toFixed(2)}σ จาก Open ($${O.toFixed(2)})`});
 
-  if(longGammaRegime) {
-    reasons.shared.push({tag:'pos', txt:`Net GEX ${totalGex>=0?'+':''}${totalGex.toFixed(1)}M — Long Gamma regime, Mean-Revert`, score:14});
-    scoreLong += 14; scoreShort += 14;
+  let entry=null,stop=null,target=null,entrySub='',stopSub='',targetSub='';
+  let verdict='NEUTRAL',icon='⏳',action='',tagline='',verdictClass='neutral';
+  let winProb='—';
+
+  if(longGammaRegime){
+    if(quadrant==='upper_action'||quadrant==='upper_watch'){
+      verdict='SHORT';icon='🔴';verdictClass='short';
+      action='Fade การขึ้น — Sell near +1σ / Call Wall';
+      tagline='Long Gamma → Dealer ขายตาม → กลับมา Open';
+      entry=cw?Math.min(F,cw):upTrigger; stop=entry+sd1d*0.5; target=O;
+      entrySub=cw?`Call Wall $${cw}`:`+1σ $${upTrigger.toFixed(0)}`;
+      stopSub='+0.5σ_1D above'; targetSub='Open (mean-revert)';
+      winProb='~73%'; score=Math.min(score+15,95);
+    } else if(quadrant==='lower_action'||quadrant==='lower_watch'){
+      verdict='LONG';icon='🟢';verdictClass='long';
+      action='Fade การลง — Buy near −1σ / Put Wall';
+      tagline='Long Gamma → Dealer ซื้อตาม → กลับมา Open';
+      entry=pw?Math.max(F,pw):dnTrigger; stop=entry-sd1d*0.5; target=O;
+      entrySub=pw?`Put Wall $${pw}`:`−1σ $${dnTrigger.toFixed(0)}`;
+      stopSub='−0.5σ_1D below'; targetSub='Open (mean-revert)';
+      winProb='~73%'; score=Math.min(score+15,95);
+    } else {
+      verdict='WAIT';icon='⏳';verdictClass='neutral';
+      action='รอราคาเข้าใกล้ขอบ Zone'; tagline='Long Gamma — Edge ต่ำตอนนี้'; winProb='—'; score=50;
+    }
   } else {
-    reasons.shared.push({tag:'warn', txt:`Net GEX ${totalGex.toFixed(1)}M — Short Gamma, ตลาด Trending (Fade เสี่ยง)`, score:-12});
-    scoreLong -= 12; scoreShort -= 12;
+    if(quadrant==='upper_trend'){
+      verdict='LONG';icon='🟢';verdictClass='long';
+      action='Momentum Long — Short Gamma';tagline='Dealer ซื้อตาม → trend ขึ้น';
+      entry=F; stop=F-sd1d*0.5; target=cw||(F+sd1d);
+      entrySub='Current price'; stopSub='−0.5σ_1D'; targetSub=cw?`Call Wall $${cw}`:'';
+      winProb='~55%'; score=Math.max(score+5,40);
+    } else if(quadrant==='lower_trend'){
+      verdict='SHORT';icon='🔴';verdictClass='short';
+      action='Momentum Short — Short Gamma';tagline='Dealer ขายตาม → trend ลง';
+      entry=F; stop=F+sd1d*0.5; target=pw||(F-sd1d);
+      entrySub='Current price'; stopSub='+0.5σ_1D'; targetSub=pw?`Put Wall $${pw}`:'';
+      winProb='~55%'; score=Math.max(score+5,40);
+    } else {
+      verdict='WAIT';icon='⏳';verdictClass='neutral';
+      action='รอทิศทาง — Short Gamma กลาง';tagline='Short Gamma — Spike ได้ทั้งสองทาง';winProb='—';score=45;
+    }
   }
-
-  if(pw && F > pw && (F - pw) < 1.5*sd1d) {
-    reasons.long.push({tag:'pos', txt:`ใกล้ Put Wall $${pw} (ระยะ $${(F-pw).toFixed(1)}) — Dealer Support`, score:14});
-    scoreLong += 14;
-  }
-  if(cw && F < cw && (cw - F) < 1.5*sd1d) {
-    reasons.short.push({tag:'pos', txt:`ใกล้ Call Wall $${cw} (ระยะ $${(cw-F).toFixed(1)}) — Dealer Resistance`, score:14});
-    scoreShort += 14;
-  }
-
-  if(flipUp && F >= flipUp) {
-    reasons.shared.push({tag:'pos', txt:`ราคาอยู่เหนือ Gamma Flip ↑ $${flipUp} → Pinning ใช้งานได้`, score:8});
-    scoreLong += 8; scoreShort += 8;
-  } else if(flipDn && F < flipDn) {
-    reasons.shared.push({tag:'warn', txt:`ราคาต่ำกว่า Gamma Flip ↓ $${flipDn} → Trending regime, ระวัง Fade`, score:-10});
-    scoreLong -= 10; scoreShort -= 10;
-  }
-
-  if(futChg > 0 && ivChg > 0.3) {
-    reasons.short.push({tag:'neg', txt:`⚠ Vanna risk — Spot↑+IV↑ ดันให้ MM ไล่ซื้อ (Gold Squeeze)`, score:-15});
-    scoreShort -= 15;
-  }
-  if(futChg < -1 && ivChg > 0.5) {
-    reasons.long.push({tag:'neg', txt:`⚠ Panic Hedging — Spot↓+IV↑ ฝั่ง Long ยังเสี่ยง Cascading`, score:-12});
-    scoreLong -= 12;
-  }
-
-  const regime = regimeFromIV(iv);
-  if(regime.name === 'Extreme') {
-    reasons.shared.push({tag:'warn', txt:`${regime.emoji} Extreme Regime (IV ${iv.toFixed(1)}%) — ลด size, stops กว้าง`, score:-8});
-    scoreLong -= 8; scoreShort -= 8;
-  } else if(regime.name === 'Mid') {
-    reasons.shared.push({tag:'pos', txt:`${regime.emoji} Mid Regime (IV ${iv.toFixed(1)}%) — best risk-adjusted`, score:5});
-    scoreLong += 5; scoreShort += 5;
-  }
-
-  if(timeWarn) {
-    reasons.shared.push({tag:'warn', txt:timeWarn, score:-5});
-    scoreLong -= 5; scoreShort -= 5;
-  }
-
-  let verdict, action, tagline, entry, stop, target, plan_reasons;
-  const margin = scoreLong - scoreShort;
-  const winnerScore = Math.max(scoreLong, scoreShort);
-  let confidenceOverride = null;
-  let winProbOverride = null;
-
-  if(absSdPos < 1) {
-    // 🎰 BLOCK SCALP MODE — ราคาในกรอบ ±1σ จาก Open
-    // Primary $25 block (per user preference) + show $50/$100 as alternatives
-    const block = 25;
-    const halfBlk = block / 2;
-    const below = Math.floor(F / block) * block;
-    const above = below + block;
-    const mid = (below + above) / 2;
-    const recBlk = sd1d < 30 ? 25 : sd1d < 60 ? 50 : 100;
-    const b50 = {below: Math.floor(F/50)*50, above: Math.floor(F/50)*50 + 50};
-    const b100 = {below: Math.floor(F/100)*100, above: Math.floor(F/100)*100 + 100};
-    // Directional bias hint from gap
-    let biasNote = '';
-    if(futChg < -3) biasNote = ' · Gap-down → bias Long ขอบล่าง';
-    else if(futChg > 3) biasNote = ' · Gap-up → bias Short ขอบบน';
-    verdict = 'scalp';
-    action = 'BLOCK SCALP';
-    tagline = `เก็บ Block $${block}: Long $${below} / Short $${above}${biasNote}`;
-    entry = {
-      lo: below, hi: above, mid,
-      blockBelow: below, blockAbove: above, blockMid: mid,
-      blockSize: block, halfBlock: halfBlk,
-      sec50: b50, sec100: b100, recommendedBlock: recBlk
-    };
-    stop = halfBlk;     // distance (not absolute price)
-    target = halfBlk;   // distance for 1:1 (mid). Extend +block for 1:2.
-    plan_reasons = [
-      {tag:'pos', txt:`🎰 Block $${block}: Long $${below} → SL $${(below-halfBlk).toFixed(1)} / TP $${mid} (1:1) หรือ $${above} (1:2)`, score:8},
-      {tag:'pos', txt:`🎰 Block $${block}: Short $${above} → SL $${(above+halfBlk).toFixed(1)} / TP $${mid} (1:1) หรือ $${below} (1:2)`, score:8},
-      ...reasons.shared.filter(r => !r.txt.includes('No-Trade Zone'))
-    ];
-    if(recBlk !== 25) plan_reasons.unshift({tag:'warn', txt:`σ-D=$${sd1d.toFixed(0)} สูง → ลด lot หรือ พิจารณา Block $${recBlk} (Long $${recBlk===50?b50.below:b100.below} / Short $${recBlk===50?b50.above:b100.above})`, score:3});
-    if(longGammaRegime) plan_reasons.unshift({tag:'pos', txt:`Long Gamma regime — Pin มาที่ block boundary มีโอกาสสูง (~60% win)`, score:5});
-    confidenceOverride = longGammaRegime ? 55 : 35;
-    winProbOverride = longGammaRegime ? 60 : 50;
-  } else if(winnerScore < 18 || Math.abs(margin) < 8) {
-    verdict = 'neutral';
-    action = 'WAIT';
-    tagline = 'Signals ขัดแย้งกัน — รอ confirmation เพิ่มเติม';
-    entry = stop = target = null;
-    plan_reasons = [...reasons.shared];
-  } else if(margin > 0) {
-    verdict = 'long';
-    action = winnerScore >= 50 ? 'STRONG LONG' : 'LEAN LONG';
-    tagline = 'Fade ลงไปต่ำ — เด้งกลับสู่ Open/DGC';
-    const entryHi = Math.max(dnTrigger, pw ? pw + 5 : dnTrigger);
-    const entryLo = Math.min(F, dnActionBot);
-    entry = { lo:entryLo, hi:entryHi, mid:(entryLo+entryHi)/2 };
-    stop = pw ? Math.min(pw - 0.5*sd1d, O - 2.5*sd1d) : O - 2.5*sd1d;
-    target = dgc && dgc > entry.mid ? dgc : O;
-    plan_reasons = [...reasons.long, ...reasons.shared];
-  } else {
-    verdict = 'short';
-    action = winnerScore >= 50 ? 'STRONG SHORT' : 'LEAN SHORT';
-    tagline = 'Fade ขึ้นไปสูง — ย่อกลับสู่ Open/DGC';
-    const entryLo = Math.min(upTrigger, cw ? cw - 5 : upTrigger);
-    const entryHi = Math.max(F, upActionTop);
-    entry = { lo:entryLo, hi:entryHi, mid:(entryLo+entryHi)/2 };
-    stop = cw ? Math.max(cw + 0.5*sd1d, O + 2.5*sd1d) : O + 2.5*sd1d;
-    target = dgc && dgc < entry.mid ? dgc : O;
-    plan_reasons = [...reasons.short, ...reasons.shared];
-  }
-  const confidence = confidenceOverride != null ? confidenceOverride : Math.max(0, Math.min(100, winnerScore));
-  const winProb = winProbOverride != null ? winProbOverride : (verdict==='neutral' ? null : gap.rate);
-  return {
-    verdict, action, tagline, confidence,
-    entry, stop, target, winProb,
-    sd1d, sd2d, upTrigger, dnTrigger,
-    scoreLong, scoreShort, reasons: plan_reasons,
-    regime, gap, quadrant, quadrantNote, timeWarn,
-    longGammaRegime, totalGex, sdPos, absSdPos
-  };
+  let rrVal=null;
+  if(entry&&stop&&target){const sd=Math.abs(entry-stop),pd=Math.abs(target-entry);rrVal=sd>0?pd/sd:null;}
+  score=Math.max(0,Math.min(100,Math.round(score)));
+  return{verdict,icon,action,tagline,verdictClass,score,reasons,entry,stop,target,
+         entrySub,stopSub,targetSub,winProb,rrVal,sd1d,sd2d,longGammaRegime,quadrant,quadrantNote,F,O,sdPos,iv};
 }
 
-// ── Render Decision Engine ─────────────────────────────
-function renderDecisionEngine(d, src){
+// ── Decision Engine renderer ────────────────────────────
+function renderDecisionEngine(d,src){
   if(!d){
-    document.getElementById('zde-action').textContent='Waiting for data…';
+    document.getElementById('zde-vlabel').textContent='Waiting…';
+    document.getElementById('zde-action').textContent='รอข้อมูล snapshot โหลด';
+    document.getElementById('zde-confnum').textContent='—';
     return;
   }
-  const verdict = document.getElementById('zde-verdict');
-  const actionEl = document.getElementById('zde-action');
-  const iconEl = document.getElementById('zde-icon');
-  const labelEl = document.getElementById('zde-vlabel');
-
-  verdict.className = 'zde-verdict ' + d.verdict;
-  actionEl.className = 'zde-action ' + d.verdict;
-  iconEl.textContent = d.verdict==='long'?'📈':d.verdict==='short'?'📉':d.verdict==='scalp'?'🎰':'⏸';
-  labelEl.textContent = d.verdict==='scalp' ? 'Block Mode' : (d.verdict==='neutral' ? 'No Edge' : 'Direction');
-  actionEl.textContent = d.action;
-  document.getElementById('zde-tagline').textContent = d.tagline;
-  document.getElementById('zde-confnum').textContent = `${d.confidence.toFixed(0)} / 100`;
-  document.getElementById('zde-confbar').style.width = `${d.confidence}%`;
-
-  const fmt = (v) => v==null ? '—' : `$${v.toFixed(2)}`;
-  if(d.verdict === 'scalp' && d.entry){
-    // 🎰 Block Scalp render — show both Long+Short block boundaries
-    const e = d.entry;
-    document.getElementById('zde-entry').textContent = `🟢$${e.blockBelow}  🔴$${e.blockAbove}`;
-    document.getElementById('zde-entry-sub').textContent = `Block $${e.blockSize} · Long ขอบล่าง / Short ขอบบน${e.recommendedBlock!==25?` · σ-D สูง → block $${e.recommendedBlock} ก็ใช้ได้`:''}`;
-    document.getElementById('zde-stop').textContent = `±$${e.halfBlock}`;
-    document.getElementById('zde-stop-sub').textContent = `Half-block · จาก block boundary`;
-    document.getElementById('zde-target').textContent = `$${e.blockMid} / $${e.blockSize===25?e.blockAbove:e.blockBelow}`;
-    document.getElementById('zde-target-sub').textContent = `Mid (1:1) / ตรงข้าม block (1:2)`;
-    document.getElementById('zde-rr').textContent = '1 : 1  หรือ  1 : 2';
-    document.getElementById('zde-rr').style.color = 'var(--gold-l)';
-    document.getElementById('zde-winp').textContent = d.winProb!=null ? `~${d.winProb.toFixed(0)}%` : '~55%';
-    const account = parseFloat(document.getElementById('zp-account')?.value) || 10000;
-    const riskPct = parseFloat(document.getElementById('zp-risk')?.value) || 1;
-    const lots = (account * riskPct / 100) / (e.halfBlock * 100);
-    document.getElementById('zde-lots').textContent = lots.toFixed(2);
-  } else if(d.entry && d.stop != null && d.target != null){
-    const entryMid = d.entry.mid;
-    document.getElementById('zde-entry').textContent = `${fmt(d.entry.lo)} - ${fmt(d.entry.hi)}`;
-    document.getElementById('zde-entry-sub').textContent = `mid ${fmt(entryMid)}  (${d.verdict==='long'?'≈Put Wall':'≈Call Wall'})`;
-    document.getElementById('zde-stop').textContent = fmt(d.stop);
-    document.getElementById('zde-stop-sub').textContent = `Δ ${(Math.abs(d.stop-entryMid)).toFixed(1)} pts  (${(Math.abs(d.stop-entryMid)/d.sd1d).toFixed(2)}σ-D)`;
-    document.getElementById('zde-target').textContent = fmt(d.target);
-    document.getElementById('zde-target-sub').textContent = `Δ ${(Math.abs(d.target-entryMid)).toFixed(1)} pts  (Open / DGC)`;
-    const rr = Math.abs(d.target - entryMid) / Math.abs(d.stop - entryMid);
-    const rrEl = document.getElementById('zde-rr');
-    rrEl.textContent = `1 : ${rr.toFixed(2)}`;
-    rrEl.style.color = rr >= 2 ? 'var(--green-l)' : rr >= 1 ? 'var(--gold-l)' : 'var(--red-l)';
-    document.getElementById('zde-winp').textContent = d.winProb!=null ? `${d.winProb.toFixed(0)}%` : '—';
-    const account = parseFloat(document.getElementById('zp-account')?.value) || 10000;
-    const riskPct = parseFloat(document.getElementById('zp-risk')?.value) || 1;
-    const stopDist = Math.abs(d.stop - entryMid);
-    const lots = (account * riskPct / 100) / (stopDist * 100);
-    document.getElementById('zde-lots').textContent = lots.toFixed(2);
-  } else {
-    document.getElementById('zde-entry').textContent = '—';
-    document.getElementById('zde-entry-sub').textContent = `wait > ±1σ-D from Open`;
-    document.getElementById('zde-stop').textContent = '—';
-    document.getElementById('zde-stop-sub').textContent = '—';
-    document.getElementById('zde-target').textContent = '—';
-    document.getElementById('zde-target-sub').textContent = '—';
-    document.getElementById('zde-rr').textContent = '—';
-    document.getElementById('zde-winp').textContent = '—';
-    document.getElementById('zde-lots').textContent = '—';
-  }
-
-  const seen = new Set();
-  const reasons = d.reasons
-    .filter(r => { if(seen.has(r.txt)) return false; seen.add(r.txt); return true; })
-    .sort((a,b) => Math.abs(b.score) - Math.abs(a.score))
-    .slice(0,6);
-  const reasonsHtml = reasons.map(r => {
-    const mark = r.tag==='pos'?'✓':r.tag==='neg'?'✗':'⚠';
-    const sign = r.score>=0?'+':'';
-    return `<div class="zde-reason ${r.tag}">
-      <span class="zde-rmark">${mark}</span>
-      <span class="zde-rtxt">${r.txt}</span>
-      <span class="zde-rscore">${sign}${r.score}</span>
-    </div>`;
-  }).join('');
-  document.getElementById('zde-reasons').innerHTML = reasonsHtml || '<div class="zde-reason"><span class="zde-rmark">•</span><span class="zde-rtxt" style="color:var(--muted);">ไม่มี signal เด่นชัด</span></div>';
-
-  const chips = [];
-  chips.push(`<span class="zde-chip ${d.longGammaRegime?'ok':'danger'}">GEX ${d.totalGex>=0?'+':''}${d.totalGex.toFixed(1)}M</span>`);
-  chips.push(`<span class="zde-chip ${d.regime.name==='Extreme'?'danger':d.regime.name==='High'?'warn':d.regime.name==='Mid'?'info':'ok'}">${d.regime.emoji} ${d.regime.name} (IV ${src.atmIV.toFixed(1)}%)</span>`);
-  chips.push(`<span class="zde-chip info">Gap ${d.gap.label} → ${d.gap.rate}%</span>`);
-  chips.push(`<span class="zde-chip">σ-D ±$${d.sd1d.toFixed(1)}  (Triggers ${d.dnTrigger.toFixed(0)}/${d.upTrigger.toFixed(0)})</span>`);
-  chips.push(`<span class="zde-chip ${d.quadrant==='Long Buildup / Vanna Risk'||d.quadrant==='Panic / Short Buildup'?'warn':'info'}">📦 ${d.quadrant}</span>`);
-  if(d.timeWarn) chips.push(`<span class="zde-chip warn">⏰ ${d.timeWarn}</span>`);
-  const dailyEMpct = src.atmIV/16;
-  chips.push(`<span class="zde-chip">Daily EM ≈ ${dailyEMpct.toFixed(2)}%</span>`);
-  const vrp = src.atmIV - 15.7;
-  chips.push(`<span class="zde-chip ${vrp>5?'ok':vrp<-3?'danger':''}">VRP ${vrp>=0?'+':''}${vrp.toFixed(1)}pp vs hist RV</span>`);
-  document.getElementById('zde-meta').innerHTML = chips.join('');
+  document.getElementById('zde-verdict').className=`zde-verdict ${d.verdictClass}`;
+  document.getElementById('zde-icon').textContent=d.icon;
+  document.getElementById('zde-vlabel').textContent=d.verdict;
+  document.getElementById('zde-action').textContent=d.action;
+  document.getElementById('zde-tagline').textContent=d.tagline;
+  document.getElementById('zde-confnum').textContent=`${d.score}%`;
+  const bar=document.getElementById('zde-confbar');
+  bar.style.width=`${d.score}%`;
+  bar.style.background=d.score>=70?'var(--green)':d.score>=50?'var(--gold)':'var(--red)';
+  document.getElementById('zde-entry').textContent=d.entry?`$${d.entry.toFixed(2)}`:'—';
+  document.getElementById('zde-entry-sub').textContent=d.entrySub||'—';
+  document.getElementById('zde-stop').textContent=d.stop?`$${d.stop.toFixed(2)}`:'—';
+  document.getElementById('zde-stop-sub').textContent=d.stopSub||'—';
+  document.getElementById('zde-target').textContent=d.target?`$${d.target.toFixed(2)}`:'—';
+  document.getElementById('zde-target-sub').textContent=d.targetSub||'—';
+  const rrEl=document.getElementById('zde-rr');
+  if(d.rrVal){rrEl.textContent=`1:${d.rrVal.toFixed(2)}`;rrEl.className=d.rrVal>=2?'val-green':d.rrVal>=1?'val-gold':'val-red';}
+  else{rrEl.textContent='—';rrEl.className='';}
+  document.getElementById('zde-winp').textContent=d.winProb||'—';
+  const acc=parseFloat(document.getElementById('zp-account')?.value)||10000;
+  const risk=parseFloat(document.getElementById('zp-risk')?.value)||1;
+  if(d.entry&&d.stop){const sd=Math.abs(d.entry-d.stop);if(sd>0)document.getElementById('zde-lots').textContent=((acc*(risk/100))/(sd*100)).toFixed(3);}
+  document.getElementById('zde-reasons').innerHTML=d.reasons.map(r=>`<div class="zde-reason"><span class="zde-rmark">${r.icon}</span><span class="zde-rtxt">${r.text}</span></div>`).join('');
+  document.getElementById('zde-meta').innerHTML=
+    `<span class="zde-chip">σ_1D:$${d.sd1d.toFixed(1)}</span><span class="zde-chip">Pos:${d.sdPos>=0?'+':''}${d.sdPos.toFixed(2)}σ</span><span class="zde-chip">IV:${d.iv.toFixed(2)}%</span><span class="zde-chip ${d.longGammaRegime?'green':'red'}">${d.longGammaRegime?'Long Gamma':'Short Gamma'}</span>`;
 }
 
-// ── Snapshot Delta (Call/Put Change vs Previous) ───────
-function computeSnapshotDelta(curr, prev){
-  if(!curr || !prev || !curr.rows || !prev.rows) return null;
-  const prevMap = new Map(prev.rows.map(r => [r.strike, r]));
-  const deltas = curr.rows.map(c => {
-    const p = prevMap.get(c.strike) || {call:0, put:0};
-    return {strike:c.strike, dCall:c.call - p.call, dPut:c.put - p.put,
-            callNow:c.call, putNow:c.put, callPrev:p.call||0, putPrev:p.put||0};
+
+// ── Snapshot Delta ─────────────────────────────────────
+function computeSnapshotDelta(curr,prev){
+  if(!curr||!prev)return null;
+  const currMap={},prevMap={};
+  curr.rows.forEach(r=>currMap[r.strike]=r);
+  prev.rows.forEach(r=>prevMap[r.strike]=r);
+  const allStrikes=[...new Set([...curr.rows.map(r=>r.strike),...prev.rows.map(r=>r.strike)])];
+  const changes=[];
+  allStrikes.forEach(K=>{
+    const c=currMap[K],p=prevMap[K];
+    const callDelta=(c?.call||0)-(p?.call||0);
+    const putDelta=(c?.put||0)-(p?.put||0);
+    if(callDelta!==0) changes.push({strike:K,type:'C',delta:callDelta,now:c?.call||0});
+    if(putDelta!==0)  changes.push({strike:K,type:'P',delta:putDelta, now:c?.put||0});
   });
-  const totalDCall = deltas.reduce((s,d) => s + d.dCall, 0);
-  const totalDPut  = deltas.reduce((s,d) => s + d.dPut, 0);
-  const totalCall  = curr.callTotal || curr.rows.reduce((s,r)=>s+r.call,0);
-  const totalPut   = curr.putTotal  || curr.rows.reduce((s,r)=>s+r.put,0);
-
-  const sorted = deltas
-    .flatMap(d => [{strike:d.strike,type:'C',delta:d.dCall,now:d.callNow},
-                   {strike:d.strike,type:'P',delta:d.dPut, now:d.putNow}])
-    .filter(x => x.delta !== 0)
-    .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta));
-  const topUp   = sorted.filter(x => x.delta > 0).slice(0,6);
-  const topDown = sorted.filter(x => x.delta < 0).slice(0,6);
-
-  let quadrant, qColor;
-  const absC = Math.abs(totalDCall), absP = Math.abs(totalDPut);
-  if(totalDCall > 0 && totalDCall > absP)                  { quadrant='📈 Call Build (Bullish flow)';  qColor='var(--green-l)'; }
-  else if(totalDPut > 0 && totalDPut > absC)               { quadrant='📉 Put Build (Bearish flow)';   qColor='var(--red-l)'; }
-  else if(totalDCall < 0 && Math.abs(totalDCall) > absP)   { quadrant='⬇ Call Unwind';                 qColor='var(--gold-l)'; }
-  else if(totalDPut < 0 && Math.abs(totalDPut) > absC)     { quadrant='⬇ Put Unwind';                  qColor='var(--blue-l)'; }
-  else                                                      { quadrant='Mixed / Quiet';                qColor='var(--muted)'; }
-
-  return {totalDCall, totalDPut, totalCall, totalPut, topUp, topDown, quadrant, qColor};
+  const topUp=changes.filter(x=>x.delta>0).sort((a,b)=>b.delta-a.delta).slice(0,5);
+  const topDown=changes.filter(x=>x.delta<0).sort((a,b)=>a.delta-b.delta).slice(0,5);
+  const callTotal=changes.filter(x=>x.type==='C').reduce((s,x)=>s+x.delta,0);
+  const putTotal=changes.filter(x=>x.type==='P').reduce((s,x)=>s+x.delta,0);
+  return{topUp,topDown,callTotal,putTotal};
 }
 
-function renderSnapshotDelta(delta, mode){
-  const totalCallEl  = document.getElementById('delta-call-total');
-  const totalPutEl   = document.getElementById('delta-put-total');
-  const quadrantEl   = document.getElementById('delta-quadrant');
-  const metaEl       = document.getElementById('delta-meta');
-  const upList       = document.getElementById('delta-up-list');
-  const dnList       = document.getElementById('delta-dn-list');
-  if(!totalCallEl) return;
+function renderSnapshotDelta(delta,mode){
+  const upList=document.getElementById('delta-up-list');
+  const dnList=document.getElementById('delta-dn-list');
+  const metaEl=document.getElementById('delta-meta');
   if(!delta){
-    totalCallEl.textContent='—'; totalCallEl.className='zp-out-val val-n';
-    totalPutEl.textContent ='—'; totalPutEl.className='zp-out-val val-n';
-    quadrantEl.textContent='—'; quadrantEl.style.color='var(--muted)';
-    metaEl.textContent='โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ';
-    upList.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px;">ยังไม่มีข้อมูล previous</div>';
-    dnList.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px;">ยังไม่มีข้อมูล previous</div>';
+    const msg='<div style="color:var(--muted);font-size:11px;padding:8px;">โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ</div>';
+    if(upList)upList.innerHTML=msg;
+    if(dnList)dnList.innerHTML=msg;
+    if(metaEl)metaEl.textContent='โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ';
     return;
   }
-  const cSign = delta.totalDCall>=0?'+':'';
-  const pSign = delta.totalDPut>=0?'+':'';
-  const cPct  = delta.totalCall>0 ? (delta.totalDCall/delta.totalCall*100) : 0;
-  const pPct  = delta.totalPut>0  ? (delta.totalDPut/delta.totalPut*100)   : 0;
-  totalCallEl.textContent = `${cSign}${delta.totalDCall.toLocaleString()} (${cSign}${cPct.toFixed(1)}%)`;
-  totalCallEl.className = `zp-out-val ${delta.totalDCall>0?'val-green':delta.totalDCall<0?'val-red':'val-n'}`;
-  totalPutEl.textContent = `${pSign}${delta.totalDPut.toLocaleString()} (${pSign}${pPct.toFixed(1)}%)`;
-  totalPutEl.className = `zp-out-val ${delta.totalDPut>0?'val-red':delta.totalDPut<0?'val-green':'val-n'}`;
-  quadrantEl.textContent = delta.quadrant;
-  quadrantEl.style.color = delta.qColor;
+  const ctEl=document.getElementById('delta-call-total');
+  const ptEl=document.getElementById('delta-put-total');
+  const qdEl=document.getElementById('delta-quadrant');
+  if(ctEl){ctEl.textContent=`${delta.callTotal>=0?'+':''}${delta.callTotal.toLocaleString()}`;ctEl.className=`zp-out-val ${delta.callTotal>=0?'val-green':'val-red'}`;}
+  if(ptEl){ptEl.textContent=`${delta.putTotal>=0?'+':''}${delta.putTotal.toLocaleString()}`;ptEl.className=`zp-out-val ${delta.putTotal>=0?'val-red':'val-green'}`;}
+  if(qdEl){
+    const cD=delta.callTotal>0&&delta.callTotal>Math.abs(delta.putTotal);
+    const pD=delta.putTotal>0&&delta.putTotal>Math.abs(delta.callTotal);
+    if(cD){qdEl.textContent='🟢 Call Build-up';qdEl.className='zp-out-val val-green';}
+    else if(pD){qdEl.textContent='🔴 Put Build-up';qdEl.className='zp-out-val val-red';}
+    else{qdEl.textContent='⚖ Mixed';qdEl.className='zp-out-val val-n';}
+  }
   try{
-    const prev = previousMeta[mode]?.date, curr = currentMeta[mode]?.date;
-    if(prev && curr){
-      const dt = (new Date(curr) - new Date(prev))/60000;
-      const unit = mode==='intraday'?'Intraday Volume':'Open Interest';
-      metaEl.textContent = `${unit} · ${fmtTimeBKK(prev)} → ${fmtTimeBKK(curr)} (Δ ${dt.toFixed(0)} นาที)`;
+    const mk=mode==='oi'?'oi':'intraday';
+    const curr=currentMeta[mk]?.date,prev=previousMeta[mk]?.date;
+    if(prev&&curr){
+      const dt=(new Date(curr)-new Date(prev))/60000;
+      if(metaEl)metaEl.textContent=`${mode==='intraday'?'Intraday Volume':'Open Interest'} · ${fmtTimeBKK(prev)} → ${fmtTimeBKK(curr)} (Δ ${dt.toFixed(0)} นาที)`;
     }
   }catch(e){}
-  const fmt = (x) => {
-    const tcls = x.type==='C'?'val-green':'val-red';
-    const sign = x.delta>=0?'+':'';
-    const arrow = x.delta>=0?'▲':'▼';
+  const fmt=x=>{
+    const tcls=x.type==='C'?'val-green':'val-red';
+    const sign=x.delta>=0?'+':''; const arrow=x.delta>=0?'▲':'▼';
     return `<div class="delta-row ${x.delta>=0?'up':'dn'}">
-      <span class="ds">$${x.strike}</span>
-      <span class="dt ${tcls}">${x.type}</span>
+      <span class="ds">$${x.strike}</span><span class="dt ${tcls}">${x.type}</span>
       <span class="dv">${arrow} ${sign}${x.delta.toLocaleString()}</span>
-      <span class="dt" style="font-size:10px;color:var(--muted);">→ ${x.now.toLocaleString()}</span>
-    </div>`;
+      <span class="dt" style="font-size:10px;color:var(--muted);">→ ${x.now.toLocaleString()}</span></div>`;
   };
-  upList.innerHTML = delta.topUp.length ? delta.topUp.map(fmt).join('') : '<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการเพิ่ม</div>';
-  dnList.innerHTML = delta.topDown.length ? delta.topDown.map(fmt).join('') : '<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการลด</div>';
+  if(upList)upList.innerHTML=delta.topUp.length?delta.topUp.map(fmt).join(''):'<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการเพิ่ม</div>';
+  if(dnList)dnList.innerHTML=delta.topDown.length?delta.topDown.map(fmt).join(''):'<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการลด</div>';
 }
+
 
 // ── Block Strategy ─────────────────────────────────────
 function updateBlockStrategy(sd1d){
-  const el = document.getElementById('block-sd1d');
-  if(!el) return;
-  el.textContent = sd1d ? `$${sd1d.toFixed(1)}` : '—';
-  const p25 = document.getElementById('block-pill-25');
-  const p50 = document.getElementById('block-pill-50');
-  const p100= document.getElementById('block-pill-100');
-  [p25,p50,p100].forEach(p => p && p.classList.remove('active'));
-  if(!sd1d) return;
-  if(sd1d < 30)       p25?.classList.add('active');
-  else if(sd1d < 60)  p50?.classList.add('active');
-  else                p100?.classList.add('active');
+  const el=document.getElementById('block-sd1d');
+  if(!el)return;
+  el.textContent=sd1d?`$${sd1d.toFixed(1)}`:'—';
+  const p25=document.getElementById('block-pill-25');
+  const p50=document.getElementById('block-pill-50');
+  const p100=document.getElementById('block-pill-100');
+  [p25,p50,p100].forEach(p=>p&&p.classList.remove('active'));
+  if(!sd1d)return;
+  if(sd1d>=100&&p100)p100.classList.add('active');
+  else if(sd1d>=50&&p50)p50.classList.add('active');
+  else if(p25)p25.classList.add('active');
 }
 
-// ── Recovery Lot Calculator ────────────────────────────
-function recoveryCalc(){
-  const init = parseFloat(document.getElementById('rec-initlot')?.value) || 0;
-  const sl   = parseFloat(document.getElementById('rec-sl')?.value) || 0;
-  const tp   = parseFloat(document.getElementById('rec-tp')?.value) || 0;
-  const N    = parseInt(document.getElementById('rec-maxn')?.value) || 6;
-  const tbody= document.getElementById('rec-tbody');
-  const sumEl= document.getElementById('rec-summary');
-  if(!tbody) return;
-  if(!init || !sl || !tp){ tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:10px;">กรอกค่าให้ครบ</td></tr>'; sumEl.textContent=''; return; }
-  const GC = 100;
-  const marginPerLot = 10000;
-  const targetProfit = init * tp * GC;
-  let cumLoss = 0;
-  let cumLots = 0;
-  const rows = [];
-  for(let i=1;i<=N;i++){
-    let lot;
-    if(i===1) lot = init;
-    else { lot = (cumLoss + targetProfit) / (tp * GC); lot = Math.ceil(lot * 100) / 100; }
-    const dir = (i%2===1) ? 'BUY' : 'SELL';
-    const winGain = lot * tp * GC;
-    const lossOnThis = lot * sl * GC;
-    const cumLossIfThisLoses = cumLoss + lossOnThis;
-    const margin = (cumLots + lot) * marginPerLot;
-    rows.push({i, dir, lot, winGain, winNet: winGain - cumLoss, cumLossIfThisLoses, margin});
-    cumLoss = cumLossIfThisLoses;
-    cumLots += lot;
+
+// ── Squeeze Detector ───────────────────────────────────
+
+function findNextCluster(rows, beyondStrike, direction) {
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.gex)));
+  const threshold = maxAbs * 0.08;
+  if (direction === 'up') {
+    const c = rows.filter(r => r.strike > beyondStrike && r.gex > threshold);
+    if (!c.length) return null;
+    return c.reduce((b, r) => r.gex > b.gex ? r : b, c[0]);
+  } else {
+    const c = rows.filter(r => r.strike < beyondStrike && r.gex < -threshold);
+    if (!c.length) return null;
+    return c.reduce((b, r) => r.gex < b.gex ? r : b, c[0]);
   }
-  tbody.innerHTML = rows.map(r =>
-    `<tr>
-      <td>#${r.i}</td>
-      <td style="color:${r.dir==='BUY'?'var(--green-l)':'var(--red-l)'};font-weight:700;">${r.dir}</td>
-      <td class="rec-lot">${r.lot.toFixed(2)}</td>
-      <td class="rec-win">+$${r.winNet.toFixed(0)} <span style="color:var(--muted);font-size:10px;">(gross +$${r.winGain.toFixed(0)})</span></td>
-      <td class="rec-loss">−$${r.cumLossIfThisLoses.toFixed(0)}</td>
-      <td style="color:var(--muted);">~$${(r.margin/1000).toFixed(1)}k</td>
-    </tr>`
-  ).join('');
-  const finalLot = rows[rows.length-1].lot;
-  const worstLoss = rows[rows.length-1].cumLossIfThisLoses;
-  sumEl.innerHTML = `
-    <strong style="color:var(--text);">เป้าหมาย Net Profit ต่อรอบ:</strong> $${targetProfit.toFixed(0)} ·
-    <strong>Final Lot ที่ #${N}:</strong> <span style="color:var(--gold-l);">${finalLot.toFixed(2)}</span> ·
-    <strong>Worst-case Loss:</strong> <span style="color:var(--red-l);">$${worstLoss.toFixed(0)}</span><br>
-    <span style="color:var(--muted);font-size:11px;">⚠ <strong>คำเตือน:</strong> Recovery ระบบนี้ทำงานเหมือน Martingale — lot โตเร็ว ต้องมีหน้าตักมาก ระวัง gap / fat-tail event เพราะ 1 ครั้งสะดุดอาจล้างพอร์ตได้ — แนะนำตั้ง <strong>max sequence ≤ ${N} ครั้ง</strong> แล้วยอม cut loss สะสม</span>
-  `;
 }
 
-// ── Render full dashboard ──────────────────────────────
+function hasAirPocket(rows, from, to) {
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.gex)));
+  const lo = Math.min(from, to), hi = Math.max(from, to);
+  const sig = rows.filter(r => r.strike > lo && r.strike < hi && Math.abs(r.gex) > maxAbs * 0.05);
+  return sig.length < 2;
+}
+
+function detectSqueeze(parsed, gexRows, lv, sd1d) {
+  const F = parsed.futuresPrice;
+  if (!F || !lv.callWall?.strike || !lv.putWall?.strike) return null;
+  const callWallStrike = lv.callWall.strike;
+  const putWallStrike  = lv.putWall.strike;
+  const totalGex = gexRows.reduce((s, r) => s + r.gex, 0);
+  const regime = totalGex >= 0 ? 'positive' : 'negative';
+  const dte = parsed.dte || 0;
+  let dteLabel, dteChip;
+  if (dte < 0.5)      { dteLabel = '⚡ Hypersensitive (DTE < 0.5)';    dteChip = 'red'; }
+  else if (dte < 1.0) { dteLabel = '⚡ Gamma Compressed (DTE < 1.0)';  dteChip = 'red'; }
+  else if (dte < 5.0) { dteLabel = '🟡 Active Signal (DTE < 5)';       dteChip = 'gold'; }
+  else                { dteLabel = '🟢 Early Warning (DTE > 5)';       dteChip = 'green'; }
+  const distToCall = callWallStrike - F;
+  const distToPut  = F - putWallStrike;
+  const half_sd = sd1d * 0.5;
+  let callStatus = F >= callWallStrike ? 'fired' : distToCall < half_sd ? 'imminent' : 'armed';
+  let putStatus  = F <= putWallStrike  ? 'fired' : distToPut  < half_sd ? 'imminent' : 'armed';
+  const callTarget = findNextCluster(gexRows, callWallStrike, 'up');
+  const putTarget  = findNextCluster(gexRows, putWallStrike,  'down');
+  const callAirPocket = callTarget ? hasAirPocket(gexRows, callWallStrike, callTarget.strike) : true;
+  const putAirPocket  = putTarget  ? hasAirPocket(gexRows, putWallStrike,  putTarget.strike)  : true;
+  const modeKey = currentMode === 'oi' ? 'oi' : 'intraday';
+  const prevIV  = previousData[modeKey]?.atmIV || 0;
+  const vannaActive = (parsed.futChg < 0) && (prevIV > 0) && (parsed.atmIV > prevIV);
+  const ivDelta = prevIV > 0 ? (parsed.atmIV - prevIV).toFixed(2) : null;
+  const pcr = parsed.callTotal > 0 ? (parsed.putTotal / parsed.callTotal) : 0;
+  let pcrLabel, pcrChip;
+  if (pcr >= 3.0)      { pcrLabel = `${pcr.toFixed(2)} — Extreme Put 🔴`; pcrChip = 'red'; }
+  else if (pcr >= 2.0) { pcrLabel = `${pcr.toFixed(2)} — Put Armed 🟠`;   pcrChip = 'red'; }
+  else if (pcr >= 1.2) { pcrLabel = `${pcr.toFixed(2)} — Moderate Put`;   pcrChip = 'gold'; }
+  else if (pcr <= 0.5) { pcrLabel = `${pcr.toFixed(2)} — Call Dom 🟢`;    pcrChip = 'green'; }
+  else                 { pcrLabel = `${pcr.toFixed(2)} — Balanced`;        pcrChip = 'blue'; }
+  return { regime, dteLabel, dteChip, callWallStrike, putWallStrike, distToCall, distToPut,
+           callStatus, putStatus, callTarget, putTarget, callAirPocket, putAirPocket,
+           vannaActive, ivDelta, pcr, pcrLabel, pcrChip, sd1d, F, totalGex };
+}
+
+function renderSqueezeDetector(sq) {
+  const el = document.getElementById('squeeze-content');
+  if (!el) return;
+  if (!sq) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;">ต้องการ Call Wall / Put Wall จากข้อมูล</div>'; return; }
+  const statusLabel = { fired:'🔥 FIRED', imminent:'⚡ IMMINENT', armed:'🟡 Armed' };
+  const statusColor = { fired:'#f85149', imminent:'#f0883e', armed:'#e3b341' };
+  const regimeChip = sq.regime === 'negative'
+    ? `<span class="sq-chip red">🔴 Negative GEX — Short Gamma</span>`
+    : `<span class="sq-chip green">🟢 Positive GEX — Long Gamma</span>`;
+  const callTgtHtml = sq.callTarget
+    ? `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div>
+       <div class="sq-target-val val-green">$${sq.callTarget.strike}</div>
+       <div style="font-size:10px;color:var(--muted);">+$${(sq.callTarget.strike-sq.callWallStrike).toFixed(0)} from trigger${sq.callAirPocket?' · ⚠ Air Pocket':''}</div></div>`
+    : `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div><div style="font-size:12px;color:var(--red-l);">Air Pocket — ไม่มี cluster ถัดไป</div></div>`;
+  const putTgtHtml = sq.putTarget
+    ? `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div>
+       <div class="sq-target-val val-red">$${sq.putTarget.strike}</div>
+       <div style="font-size:10px;color:var(--muted);">-$${(sq.putWallStrike-sq.putTarget.strike).toFixed(0)} from trigger${sq.putAirPocket?' · ⚠ Air Pocket':''}</div></div>`
+    : `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div><div style="font-size:12px;color:var(--red-l);">Air Pocket — ไม่มี cluster ถัดไป</div></div>`;
+  const callHtml = `<div class="sq-side ${sq.callStatus}">
+    <div class="sq-side-title">⬆ CALL SQUEEZE</div>
+    <div class="sq-status" style="color:${statusColor[sq.callStatus]}">${statusLabel[sq.callStatus]}</div>
+    <div class="sq-row"><span class="sq-k">Trigger</span><span class="sq-v val-green">$${sq.callWallStrike}</span></div>
+    <div class="sq-row"><span class="sq-k">ห่าง ATM</span><span class="sq-v">+$${sq.distToCall.toFixed(2)}</span></div>
+    <div class="sq-row"><span class="sq-k">Imminent ถ้า &lt;</span><span class="sq-v" style="color:var(--muted)">$${(sq.sd1d*0.5).toFixed(2)}</span></div>
+    ${callTgtHtml}</div>`;
+  const putHtml = `<div class="sq-side ${sq.putStatus}">
+    <div class="sq-side-title">⬇ PUT SQUEEZE</div>
+    <div class="sq-status" style="color:${statusColor[sq.putStatus]}">${statusLabel[sq.putStatus]}</div>
+    <div class="sq-row"><span class="sq-k">Trigger</span><span class="sq-v val-red">$${sq.putWallStrike}</span></div>
+    <div class="sq-row"><span class="sq-k">ห่าง ATM</span><span class="sq-v">-$${sq.distToPut.toFixed(2)}</span></div>
+    <div class="sq-row"><span class="sq-k">Imminent ถ้า &lt;</span><span class="sq-v" style="color:var(--muted)">$${(sq.sd1d*0.5).toFixed(2)}</span></div>
+    ${putTgtHtml}</div>`;
+  const closer = sq.distToCall < sq.distToPut ? 'CALL' : 'PUT';
+  const closerDist = Math.min(sq.distToCall, sq.distToPut);
+  const summaryHtml = (sq.callStatus==='fired'||sq.putStatus==='fired')
+    ? `<div class="sq-warn" style="background:rgba(218,54,51,.2);border-color:rgba(218,54,51,.7);">🔥 <strong>Squeeze กำลัง RUN</strong> — ราคาทะลุ Wall แล้ว · ดู Squeeze Target ด้านบน</div>`
+    : (sq.callStatus==='imminent'||sq.putStatus==='imminent')
+      ? `<div class="sq-warn">⚡ <strong>Imminent Squeeze</strong> — ห่าง ${closer} Wall เพียง $${closerDist.toFixed(2)} (&lt;0.5σ_1D)</div>`
+      : `<div class="sq-info">✅ ราคาอยู่ใน Neutral Zone · Squeeze Armed ทั้งสองทิศ — รอ Wall break</div>`;
+  const vannaHtml = sq.vannaActive
+    ? `<div class="sq-warn">⚠️ <strong>Vanna Warning ACTIVE</strong> — ราคาลง + IV ขึ้น${sq.ivDelta?` (+${sq.ivDelta}%)`:''}
+       → OTM Put Delta ขยาย → Dealer ขาย Futures เพิ่มโดยไม่ต้องรอราคา → <em style="color:var(--red-l)">Cascade Risk</em></div>`
+    : '';
+  el.innerHTML = `<div class="sq-regime-bar">${regimeChip}<span class="sq-chip ${sq.dteChip}">${sq.dteLabel}</span><span class="sq-chip ${sq.pcrChip}">PCR: ${sq.pcrLabel}</span></div>
+    <div class="sq-grid">${callHtml}${putHtml}</div>${summaryHtml}${vannaHtml}`;
+}
+
+
+
+// ── Composite Strike Table ─────────────────────────────
+// Merges OI + Intraday per-strike data and computes:
+//   gex_oi   = Black-76 GEX from OI      (Call_OI − Put_OI)
+//   gflow    = Black-76 GEX from Volume  (Call_Vol − Put_Vol)   = γ-Flow
+//   comp_gex = (1−α)×gex_oi + α×gflow
+//   sigma_comp = cumulative sum of comp_gex (ascending by strike)
+//   block    = |gflow/gex_oi| ≥ 1.0  (institutional block trade signal)
+function buildCompositeData(){
+  const oi=parsedData.oi, vol=parsedData.intraday;
+  if(!oi&&!vol)return null;
+  const src=oi||vol;
+  const F=src.futuresPrice, dte=src.dte;
+  const T=dte/365;
+  const oiMap={}, volMap={};
+  if(oi)oi.rows.forEach(r=>oiMap[r.strike]=r);
+  if(vol)vol.rows.forEach(r=>volMap[r.strike]=r);
+  const strikes=[...new Set([
+    ...(oi?oi.rows.map(r=>r.strike):[]),
+    ...(vol?vol.rows.map(r=>r.strike):[])
+  ])].sort((a,b)=>a-b);
+  const rows=strikes.map(K=>{
+    const ro=oiMap[K]||null, rv=volMap[K]||null;
+    const sig=(ro?.volSettle||rv?.volSettle)||0;
+    const gamma=sig>0&&T>0?b76gamma(F,K,T,sig):0;
+    const callOI=ro?.call||0, putOI=ro?.put||0;
+    const callVol=rv?.call||0, putVol=rv?.put||0;
+    const gex_oi =gamma*(callOI -putOI )*F*F*100;
+    const gflow  =gamma*(callVol-putVol)*F*F*100;
+    const comp_gex=(1-alpha)*gex_oi+alpha*gflow;
+    const ratio=Math.abs(gex_oi)>0?Math.abs(gflow)/Math.abs(gex_oi):0;
+    const block=Math.abs(gex_oi)>0&&ratio>=1.0;
+    return{strike:K,callOI,putOI,callVol,putVol,gex_oi,gflow,comp_gex,block,ratio};
+  });
+  let cum=0;
+  rows.forEach(r=>{cum+=r.comp_gex;r.sigma_comp=cum;});
+  return rows;
+}
+
+function renderCompositeTable(){
+  const card=document.getElementById('strike-table-card');
+  const caption=document.getElementById('strike-table-caption');
+  const container=document.getElementById('strike-table-container');
+  const rows=buildCompositeData();
+  if(!rows||!rows.length){card.style.display='none';return;}
+  card.style.display='block';
+  const src=parsedData.oi||parsedData.intraday;
+  const F=src.futuresPrice, dte=src.dte;
+  caption.textContent=`Composite = GEX_OI×(1−${alpha}) + γ-Flow×${alpha} | DTE ${dte?.toFixed(2)} | Black-76`;
+  const fG=v=>`${(v/1e6>=0?'+':'')}${(v/1e6).toFixed(2)}M`;
+  const colColor=v=>v>=0?'var(--green-l)':'var(--red-l)';
+  const rows2=rows.filter(r=>r.callOI||r.putOI||r.callVol||r.putVol||Math.abs(r.gex_oi)>0);
+  container.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:700px;">
+    <thead><tr style="background:var(--surface2);position:sticky;top:0;z-index:2;">
+      ${['Strike','Call OI','Put OI','Call Vol','Put Vol','GEX (OI)','γ-Flow','Comp GEX','Σ Comp','Block'].map(h=>
+        `<th style="padding:6px 8px;border:1px solid var(--border);color:var(--muted);text-align:${h==='Strike'?'left':'right'};white-space:nowrap;">${h}</th>`
+      ).join('')}
+    </tr></thead>
+    <tbody>${rows2.map(r=>{
+      const isATM=Math.abs(r.strike-F)<=2.5;
+      const bg=isATM?'rgba(210,153,34,.14)':r.block?'rgba(137,87,229,.09)':'';
+      return`<tr style="background:${bg};">
+        <td style="padding:5px 8px;border:1px solid var(--border);font-weight:${isATM?700:400};color:${isATM?'var(--gold)':'var(--text)'};">${r.strike}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;">${r.callOI.toLocaleString()}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;">${r.putOI.toLocaleString()}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;">${r.callVol.toLocaleString()}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;">${r.putVol.toLocaleString()}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:${colColor(r.gex_oi)};">${fG(r.gex_oi)}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:${colColor(r.gflow)};font-weight:${r.block?700:400};">${fG(r.gflow)}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:${colColor(r.comp_gex)};">${fG(r.comp_gex)}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:${colColor(r.sigma_comp)};">${fG(r.sigma_comp)}</td>
+        <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;">${r.block?`<span style="color:var(--purple-l);font-weight:700;">✅ ${r.ratio.toFixed(1)}×</span>`:''}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ── OI vs Vol Wall Comparison ──────────────────────────
+function renderWallComparison(){
+  const panel=document.getElementById('wall-comp-panel');
+  const tableEl=document.getElementById('wall-comp-table');
+  const oi_p=parsedData.oi, vol_p=parsedData.intraday;
+  if(!oi_p&&!vol_p){panel.style.display='none';return;}
+  panel.style.display='block';
+  document.getElementById('wc-alpha').textContent=alpha;
+  const src=oi_p||vol_p;
+  const F=src.futuresPrice;
+  // Levels from each source
+  let lvOI=null,lvVol=null,lvComp=null;
+  if(oi_p){const g=calcGEX(oi_p);lvOI=calcLevels(g.rows,F);}
+  if(vol_p){const g=calcGEX(vol_p);lvVol=calcLevels(g.rows,F);}
+  if(oi_p&&vol_p){const c=mergeComposite(oi_p,vol_p,alpha);if(c){const g=calcGEX(c);lvComp=calcLevels(g.rows,F);}}
+  else{lvComp=lvOI||lvVol;}
+  // GTBR from sd anchor
+  const mk=currentMode==='oi'?'oi':'intraday';
+  const ref=sdAnchor[mk]||src;
+  const Fo=ref.openPrice||ref.futuresPrice||F;
+  const rIV=ref.atmIV||src.atmIV;
+  const rDTE=ref.dte||src.dte;
+  const rng=(Fo&&rIV&&rDTE)?calcRange(Fo,rIV,rDTE):null;
+  const fW=lv=>lv?.callWall?.strike?`$${lv.callWall.strike}`:'—';
+  const fP=lv=>lv?.putWall?.strike?`$${lv.putWall.strike}`:'—';
+  const fF=lv=>{if(!lv)return'—';const f=lv.flipAbove?.strike||lv.flipBelow?.strike;return f?`$${f}`:'—';};
+  const fR=r=>r?`${r.lo1d.toFixed(0)}–${r.hi1d.toFixed(0)}`:'—';
+  const fRe=r=>r?`${r.lo1.toFixed(0)}–${r.hi1.toFixed(0)}`:'—';
+  // Convergence check
+  const cwOI=lvOI?.callWall?.strike||null, cwVol=lvVol?.callWall?.strike||null;
+  const pwOI=lvOI?.putWall?.strike||null, pwVol=lvVol?.putWall?.strike||null;
+  const cwConv=cwOI&&cwVol?Math.abs(cwOI-cwVol)<=25:null;
+  const pwConv=pwOI&&pwVol?Math.abs(pwOI-pwVol)<=25:null;
+  const convHtml=
+    (cwConv!==null?`<span style="color:${cwConv?'var(--green-l)':'var(--gold)'};">${cwConv?'✅':'⚠'} +Wall ${cwConv?'Converged':'Diverged'}: OI $${cwOI} vs Vol $${cwVol}</span>`:'')+
+    (pwConv!==null?` &nbsp;|&nbsp; <span style="color:${pwConv?'var(--green-l)':'var(--gold)'};">${pwConv?'✅':'⚠'} −Wall ${pwConv?'Converged':'Diverged'}: OI $${pwOI} vs Vol $${pwVol}</span>`:'');
+  const rows=[
+    ['Level','OI','Vol',`Comp (α=${alpha})`,'header'],
+    ['+GEX Wall (Resistance)',fW(lvOI)||'—',fW(lvVol)||'—',fW(lvComp)||'—',cwConv===false?'warn':cwConv===true?'ok':''],
+    ['−GEX Wall (Support)',fP(lvOI)||'—',fP(lvVol)||'—',fP(lvComp)||'—',pwConv===false?'warn':pwConv===true?'ok':''],
+    ['Flip Point',fF(lvOI),fF(lvVol),fF(lvComp),''],
+    ['GTBR Daily',fR(rng),'=',fR(rng),''],
+    ['GTBR Expiry',fRe(rng),'=',fRe(rng),''],
+  ];
+  tableEl.innerHTML=`
+    ${convHtml?`<div style="font-size:11px;margin-bottom:8px;">${convHtml}</div>`:''}
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      ${rows.map((r,i)=>i===0
+        ?`<thead><tr style="background:var(--surface2);">${r.map((h,j)=>`<th style="padding:7px 12px;border:1px solid var(--border);text-align:${j===0?'left':'center'};color:var(--muted);">${h}</th>`).slice(0,4).join('')}</tr></thead><tbody>`
+        :`<tr>
+          <td style="padding:7px 12px;border:1px solid var(--border);color:var(--muted);">${r[0]}</td>
+          <td style="padding:7px 12px;border:1px solid var(--border);text-align:center;color:var(--text);">${r[1]}</td>
+          <td style="padding:7px 12px;border:1px solid var(--border);text-align:center;color:${r[2]==='='?'var(--muted)':'var(--text)'};">${r[2]}</td>
+          <td style="padding:7px 12px;border:1px solid var(--border);text-align:center;color:var(--text);">${r[3]}</td>
+        </tr>`
+      ).join('')}</tbody>
+    </table>`;
+}
+
+
+
+
 function renderAll(src){
   const gexData=calcGEX(src);
   const lv=calcLevels(gexData.rows,src.futuresPrice);
@@ -2130,6 +2699,19 @@ function renderAll(src){
   const delta = computeSnapshotDelta(parsedData[mode], previousData[mode]);
   renderSnapshotDelta(delta, mode);
   updateBlockStrategy(decision?.sd1d);
+  // ── Squeeze Detector ──────────────────────────────────
+  const modeKeyS = currentMode==='oi' ? 'oi' : 'intraday';
+  const refS = sdAnchor[modeKeyS] || src;
+  const FopenS = refS.openPrice || refS.futuresPrice || src.futuresPrice;
+  const refIVS = refS.atmIV || src.atmIV;
+  const sd1dS = (FopenS && refIVS) ? FopenS * (refIVS/100) * Math.sqrt(1/252) : 0;
+  const sq = detectSqueeze(src, gexData.rows, lv, sd1dS);
+  renderSqueezeDetector(sq);
+  // ─────────────────────────────────────────────────────
+  // ── OI vs Vol Wall Comparison + Composite Table ──────
+  renderWallComparison();
+  renderCompositeTable();
+  // ─────────────────────────────────────────────────────
   if(currentTab==='cumulative')renderCumulative();
   zpSyncFromData(src);
 }
@@ -2162,6 +2744,9 @@ function onAlphaChange(){
     renderAll(src);
   }
 }
+
+
+
 
 // ── Load snapshot ──────────────────────────────────────
 async function loadSnapshot(idx,mode){
@@ -2202,6 +2787,8 @@ async function selectSnap(idx,mode){
   }
 }
 
+
+
 async function ensureMode(mode){
   if(commits[mode].length===0){
     const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
@@ -2233,6 +2820,7 @@ async function refreshData(){
   commits={intraday:[],oi:[]};parsedData={intraday:null,oi:null};
   previousData={intraday:null,oi:null};currentMeta={intraday:null,oi:null};previousMeta={intraday:null,oi:null};
   sessionIVs=[];firstOfDay={intraday:null,oi:null};
+  sdAnchor={intraday:null,oi:null};sdAnchorTime={intraday:0,oi:0};
   await ensureMode(currentMode==='oi'?'oi':'intraday');
   if(currentMode==='composite'){await ensureMode('oi');await ensureMode('intraday');}
   const src=currentMode==='composite'?mergeComposite(parsedData.oi,parsedData.intraday,alpha):parsedData[currentMode];
@@ -2264,6 +2852,7 @@ function zpSyncFromData(src){
   zpCalc();
   zpTargetCalc();
 }
+
 function zpCalc(){
   const F=parseFloat(document.getElementById('zp-price').value)||0;
   const ivPct=parseFloat(document.getElementById('zp-iv').value)||0;
@@ -2315,6 +2904,8 @@ function zpCalc(){
   document.getElementById('sizer-regime').style.borderRadius='8px';
   document.getElementById('sizer-regime').textContent=regime;
 }
+
+
 function zpRR(){
   const entry=parseFloat(document.getElementById('zp-entry').value)||0;
   const stop=parseFloat(document.getElementById('zp-stop').value)||0;
@@ -2342,28 +2933,18 @@ function zpRR(){
   document.getElementById('zp-out-stop').textContent=`$${stopDist.toFixed(2)}`;
 }
 
+
+
 // ── Expected Move at Target Price ──────────────────────
 function zpTargetCalc(){
   const targetPrice=parseFloat(document.getElementById('zp-target-price').value)||0;
-  const clearOutputs=()=>{
-    ['tm-strike','tm-vol','tm-move','tm-tp','tm-sl','tm-dte'].forEach(id=>{
-      document.getElementById(id).textContent='—';
-    });
-  };
+  const clearOutputs=()=>['tm-strike','tm-vol','tm-move','tm-tp','tm-sl','tm-dte'].forEach(id=>{document.getElementById(id).textContent='—';});
   if(!targetPrice){clearOutputs();return;}
-  if(!zpCurrentRows||!zpCurrentRows.length||!zpCurrentDTE){
-    document.getElementById('tm-strike').textContent='รอข้อมูล…';
-    return;
-  }
-  // Find nearest strike in data rows
-  const nearest=zpCurrentRows.reduce((b,r)=>
-    Math.abs(r.strike-targetPrice)<Math.abs(b.strike-targetPrice)?r:b, zpCurrentRows[0]);
-  const vol=nearest.volSettle;  // already decimal (e.g. 0.2712 = 27.12%)
+  if(!zpCurrentRows||!zpCurrentRows.length||!zpCurrentDTE){document.getElementById('tm-strike').textContent='รอข้อมูล…';return;}
+  const nearest=zpCurrentRows.reduce((b,r)=>Math.abs(r.strike-targetPrice)<Math.abs(b.strike-targetPrice)?r:b,zpCurrentRows[0]);
+  const vol=nearest.volSettle;
   if(!vol){clearOutputs();return;}
-
-  // Expected Move at target: Target × vol_settle × √(DTE/252)
   const move=targetPrice*vol*Math.sqrt(zpCurrentDTE/252);
-
   document.getElementById('tm-strike').textContent=`$${nearest.strike}`;
   document.getElementById('tm-vol').textContent=`${(vol*100).toFixed(2)}%`;
   document.getElementById('tm-dte').textContent=zpCurrentDTE.toFixed(3);
@@ -2371,6 +2952,396 @@ function zpTargetCalc(){
   document.getElementById('tm-tp').textContent=`$${(targetPrice+move).toFixed(2)}`;
   document.getElementById('tm-sl').textContent=`$${(targetPrice-move).toFixed(2)}`;
 }
+
+
+// ── Recovery Calculator ────────────────────────────────
+function recoveryCalc(){
+  const initLot=parseFloat(document.getElementById('rec-initlot')?.value)||0.1;
+  const sl=parseFloat(document.getElementById('rec-sl')?.value)||12.5;
+  const tp=parseFloat(document.getElementById('rec-tp')?.value)||12.5;
+  const maxN=parseInt(document.getElementById('rec-maxn')?.value)||3;
+  const GC=100;
+  const el=document.getElementById('rec-output');
+  if(!el)return;
+  let rows=[],cumLoss=0;
+  for(let n=1;n<=maxN;n++){
+    const lot=initLot*n;
+    const risk=lot*sl*GC; const reward=lot*tp*GC;
+    cumLoss+=risk;
+    const be=cumLoss/(lot*GC);
+    rows.push({n,lot:lot.toFixed(2),risk:risk.toFixed(0),reward:reward.toFixed(0),cumLoss:cumLoss.toFixed(0),be:be.toFixed(2)});
+  }
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="background:var(--surface2);">${['Level','Lots','Risk','Reward','Cum Loss','BE Move'].map(h=>`<th style="padding:6px 8px;border:1px solid var(--border);color:var(--muted);">${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;">${r.n}</td>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;">${r.lot}</td>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:var(--red-l);">-$${r.risk}</td>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:var(--green-l);">+$${r.reward}</td>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:var(--red-l);">-$${r.cumLoss}</td>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;color:var(--gold-l);">$${r.be}</td></tr>`).join('')}</tbody></table>`;
+}
+
+
+// ═══════════════════════════════════════════════════════
+// Vol Chart tab — state + helpers
+// ═══════════════════════════════════════════════════════
+let vcChart=null;
+let vcTVLoaded=false;
+let vcSpotPrice=null;
+
+// ── Normal quantile function (Acklam approximation) ────
+function normInv(p){
+  if(p<=0)return -Infinity;
+  if(p>=1)return Infinity;
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00];
+  const b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01];
+  const c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00];
+  const d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const plo=0.02425,phi=1-plo;
+  if(p<plo){const q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  if(p<=phi){const q=p-0.5,r=q*q;return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+  const q=Math.sqrt(-2*Math.log(1-p));return-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+
+// ── Strike for given call delta (Black-76) ─────────────
+function strikeAtCallDelta(F,T,sig,delta){
+  if(T<=0||sig<=0)return F;
+  const d1=normInv(delta);
+  return F*Math.exp(-d1*sig*Math.sqrt(T)+0.5*sig*sig*T);
+}
+// ── Strike for given put |delta| ───────────────────────
+function strikeAtPutDelta(F,T,sig,absDelta){
+  if(T<=0||sig<=0)return F;
+  const d1=normInv(1-absDelta);
+  return F*Math.exp(-d1*sig*Math.sqrt(T)+0.5*sig*sig*T);
+}
+
+// ── Populate commit buttons (mirrors GEX tab) ──────────
+function populateVCCommits(){
+  const row=document.getElementById('vc-commit-row');
+  if(!row)return;
+  const cs=commits.intraday||[];
+  if(!cs.length){row.innerHTML='<span style="color:var(--muted);font-size:12px;">ยังไม่มีข้อมูล</span>';return;}
+  row.innerHTML='';
+  cs.forEach((c,i)=>{
+    const btn=document.createElement('button');
+    btn.className='snap-btn'+(i===0?' active':'');
+    btn.textContent=fmtTimeBKK(c.commit.author.date);
+    btn.onclick=async()=>{
+      row.querySelectorAll('.snap-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const raw=await fetchFileAtCommit('IntradayData.txt',c.sha);
+      if(raw){
+        const p=parseGBT(raw);
+        renderVolChart(p);
+        updateVCMetrics(p);
+      }
+    };
+    row.appendChild(btn);
+  });
+}
+
+// ── Render CME-style Vol Chart ─────────────────────────
+function renderVolChart(parsed){
+  if(!parsed||!parsed.rows||!parsed.rows.length)return;
+  const F=parsed.futuresPrice;
+  const sig=parsed.atmIV/100;
+  const T=parsed.dte/365;
+
+  // Filter rows: ±10% from ATM, sort by strike asc
+  const rows=[...parsed.rows]
+    .filter(r=>r.strike>F*0.88&&r.strike<F*1.12&&(r.call>0||r.put>0))
+    .sort((a,b)=>a.strike-b.strike);
+  if(!rows.length)return;
+
+  const labels=rows.map(r=>r.strike.toString());
+  const callVols=rows.map(r=>r.call||0);
+  const putVols=rows.map(r=>-(r.put||0));   // negative → bars go down
+  const volSettle=rows.map(r=>r.volSettle>0?r.volSettle*100:null);
+
+  // Compute delta zone strikes
+  const deltas=[0.05,0.15,0.25,0.35,0.45];
+  const callStrikes=deltas.map(d=>strikeAtCallDelta(F,T,sig,d));
+  const putStrikes=deltas.map(d=>strikeAtPutDelta(F,T,sig,d));
+
+  // Convert strike to chart x-axis index (fractional)
+  function strikePx(k){
+    // find position as fractional label index
+    const lo=rows.findIndex(r=>r.strike>=k);
+    if(lo<=0)return lo===0?0:-1;
+    const prev=rows[lo-1].strike, cur=rows[lo].strike;
+    return lo-1+(k-prev)/(cur-prev);
+  }
+
+  if(vcChart){vcChart.destroy();vcChart=null;}
+  const ctx=document.getElementById('vcChart').getContext('2d');
+
+  // ── afterDraw plugin: delta zone bands + ATM line ────
+  const overlayPlugin={
+    id:'vcOverlay',
+    afterDraw(chart){
+      const {ctx:c,chartArea:{left,right,top,bottom},scales:{x}}=chart;
+      const W=right-left;
+      const n=rows.length;
+      function xPx(idx){return left+(idx/(n-1))*W;}
+
+      // Zone fills between delta strikes (put side left of ATM, call side right)
+      const putZonePairs=[
+        [putStrikes[3],putStrikes[4],0.25],  // 35Δ–45Δ
+        [putStrikes[2],putStrikes[3],0.08],  // 25Δ–35Δ
+        [putStrikes[1],putStrikes[2],0.15],  // 15Δ–25Δ
+        [putStrikes[0],putStrikes[1],0.25],  // 5Δ–15Δ
+      ];
+      const callZonePairs=[
+        [callStrikes[3],callStrikes[4],0.25],
+        [callStrikes[2],callStrikes[3],0.08],
+        [callStrikes[1],callStrikes[2],0.15],
+        [callStrikes[0],callStrikes[1],0.25],
+      ];
+      [...putZonePairs,...callZonePairs].forEach(([k1,k2,alpha])=>{
+        const i1=strikePx(k1),i2=strikePx(k2);
+        if(i1<0||i2<0)return;
+        const x1=Math.max(left,Math.min(right,xPx(i1)));
+        const x2=Math.max(left,Math.min(right,xPx(i2)));
+        c.save();
+        c.fillStyle=`rgba(88,166,255,${alpha})`;
+        c.fillRect(Math.min(x1,x2),top,Math.abs(x2-x1),bottom-top);
+        c.restore();
+      });
+
+      // Δ vertical dashed lines
+      const allKs=[...putStrikes,...callStrikes];
+      const allLabels=['P45Δ','P35Δ','P25Δ','P15Δ','P5Δ','C5Δ','C15Δ','C25Δ','C35Δ','C45Δ'];
+      allKs.forEach((k,i)=>{
+        const idx=strikePx(k);
+        if(idx<0)return;
+        const px=xPx(idx);
+        if(px<left||px>right)return;
+        c.save();
+        c.strokeStyle='rgba(88,166,255,0.5)';
+        c.lineWidth=1;
+        c.setLineDash([3,3]);
+        c.beginPath();c.moveTo(px,top);c.lineTo(px,bottom);c.stroke();
+        c.fillStyle='rgba(88,166,255,0.7)';
+        c.font='9px sans-serif';
+        c.fillText(allLabels[i],px+2,top+9);
+        c.restore();
+      });
+
+      // ATM line (gold)
+      const atmIdx=strikePx(F);
+      if(atmIdx>=0){
+        const atmPx=xPx(atmIdx);
+        c.save();
+        c.strokeStyle='rgba(210,153,34,0.9)';
+        c.lineWidth=2;
+        c.setLineDash([4,4]);
+        c.beginPath();c.moveTo(atmPx,top);c.lineTo(atmPx,bottom);c.stroke();
+        c.fillStyle='rgba(210,153,34,0.9)';
+        c.font='bold 10px sans-serif';
+        c.fillText(`F ${F.toFixed(0)}`,atmPx+3,top+18);
+        c.restore();
+      }
+    }
+  };
+
+  vcChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Call Volume',data:callVols,backgroundColor:'rgba(46,160,67,0.7)',borderColor:'rgba(46,160,67,0.9)',borderWidth:1,order:2},
+        {label:'Put Volume',data:putVols,backgroundColor:'rgba(218,54,51,0.7)',borderColor:'rgba(218,54,51,0.9)',borderWidth:1,order:2},
+        {label:'Vol Settle (%)',data:volSettle,type:'line',borderColor:'rgba(227,179,65,0.9)',borderWidth:2,pointRadius:0,tension:0.3,yAxisID:'yVol',order:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:300},
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:true,position:'top',labels:{color:'#8b949e',boxWidth:12,font:{size:11}}},
+        tooltip:{
+          callbacks:{
+            label(ctx){
+              if(ctx.dataset.label==='Vol Settle (%)'){return `Vol: ${ctx.raw?.toFixed(2)}%`;}
+              const v=Math.abs(ctx.raw);
+              return `${ctx.dataset.label}: ${v.toLocaleString()}`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{
+          stacked:false,
+          ticks:{color:'#8b949e',maxRotation:45,font:{size:9},maxTicksLimit:20},
+          grid:{color:'rgba(48,54,61,0.6)'}
+        },
+        y:{
+          stacked:false,
+          ticks:{color:'#8b949e',font:{size:10},
+            callback(v){return Math.abs(v).toLocaleString();}
+          },
+          grid:{color:'rgba(48,54,61,0.6)'}
+        },
+        yVol:{
+          position:'right',
+          ticks:{color:'rgba(227,179,65,0.8)',font:{size:10},
+            callback(v){return v?.toFixed(1)+'%';}
+          },
+          grid:{drawOnChartArea:false}
+        }
+      }
+    },
+    plugins:[overlayPlugin]
+  });
+
+  // Update header meta
+  const meta=document.getElementById('vc-header-meta');
+  if(meta)meta.textContent=`DTE ${parsed.dte?.toFixed(3)} | ATM ${parsed.atmIV?.toFixed(2)}% | Strikes: ${rows.length}`;
+}
+
+// ── Update VC metrics (SD levels) ─────────────────────
+function updateVCMetrics(parsed){
+  if(!parsed)return;
+  const F=parsed.futuresPrice;
+  const openF=parsed.openPrice||F;
+  const sig=parsed.atmIV/100;
+  const dte=parsed.dte;
+  const sd1=(F*sig*Math.sqrt(dte/252));
+  const sd2=2*sd1;
+  const sd1d=F*sig*Math.sqrt(1/252);
+
+  const el=(id)=>document.getElementById(id);
+  if(el('vc-futures')){el('vc-futures').textContent='$'+F.toFixed(2);el('vc-futures-sub').textContent='Contract: GC / OG';}
+  if(el('vc-1sd')){el('vc-1sd').textContent='±$'+sd1.toFixed(1);el('vc-1sd-sub').textContent=`↑${(F+sd1).toFixed(1)} / ↓${(F-sd1).toFixed(1)}`;}
+  if(el('vc-2sd')){el('vc-2sd').textContent='±$'+sd2.toFixed(1);el('vc-2sd-sub').textContent=`↑${(F+sd2).toFixed(1)} / ↓${(F-sd2).toFixed(1)}`;}
+  if(el('vc-1dd')){el('vc-1dd').textContent='±$'+sd1d.toFixed(1);el('vc-1dd-sub').textContent='Expected daily ±move';}
+
+  // Diff from spot
+  if(vcSpotPrice&&el('vc-spot')){
+    const diff=F-vcSpotPrice;
+    el('vc-spot').textContent='$'+vcSpotPrice.toFixed(2);
+    el('vc-spot-sub').textContent='via metals.live';
+    el('vc-diff').textContent=(diff>=0?'+':'')+diff.toFixed(2);
+    el('vc-diff').className='metric-value '+(diff>=0?'val-gold':'val-red');
+    el('vc-diff-sub').textContent=diff>=0?'Contango (ปกติ)':'Backwardation (ผิดปกติ)';
+  }
+
+  renderSDLevels(parsed);
+}
+
+// ── SD Levels + Round Numbers table ───────────────────
+function renderSDLevels(parsed){
+  const ct=document.getElementById('vc-sd-table');
+  if(!ct||!parsed)return;
+  const F=parsed.futuresPrice;
+  const sig=parsed.atmIV/100;
+  const dte=parsed.dte;
+  const sd1=F*sig*Math.sqrt(dte/252);
+  const sd2=2*sd1;
+  const sd3=3*sd1;
+
+  // Round-number lines at multiples of 25 in range ±sd3
+  const lo=Math.floor((F-sd3)/25)*25;
+  const hi=Math.ceil((F+sd3)/25)*25;
+  const rounds=[];
+  for(let k=lo;k<=hi;k+=25)if(k>0)rounds.push(k);
+
+  const fmt=(v,mark='')=>`<span style="color:${mark}">${v.toFixed(1)}</span>`;
+  const row=(label,up,dn,cls)=>`<tr>
+    <td style="padding:4px 10px;font-weight:700;white-space:nowrap;color:${cls};">${label}</td>
+    <td style="padding:4px 10px;text-align:right;">${up.toFixed(2)}</td>
+    <td style="padding:4px 10px;text-align:right;">${dn.toFixed(2)}</td>
+    <td style="padding:4px 10px;font-size:10px;color:var(--muted);">${(up-dn).toFixed(1)} pts wide</td>
+  </tr>`;
+
+  let html=`<table style="width:100%;border-collapse:collapse;font-size:12px;">
+  <thead><tr style="border-bottom:1px solid var(--border);">
+    <th style="padding:4px 10px;text-align:left;color:var(--muted);">Level</th>
+    <th style="padding:4px 10px;text-align:right;color:var(--muted);">Upper</th>
+    <th style="padding:4px 10px;text-align:right;color:var(--muted);">Lower</th>
+    <th style="padding:4px 10px;color:var(--muted);">Width</th>
+  </tr></thead><tbody>`;
+  html+=row('3σ Range',F+sd3,F-sd3,'var(--purple-l)');
+  html+=row('2σ Range',F+sd2,F-sd2,'var(--blue-l)');
+  html+=row('1σ Range',F+sd1,F-sd1,'var(--green-l)');
+  html+=row('1σ Daily',F+F*sig*Math.sqrt(1/252),F-F*sig*Math.sqrt(1/252),'var(--muted)');
+  html+=`</tbody></table>`;
+
+  // Round numbers sub-table
+  html+=`<div style="margin-top:10px;"><div style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:700;">ROUND NUMBERS IN RANGE (ทุก 25 pts)</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">`;
+  rounds.forEach(k=>{
+    const dist=k-F;
+    const inSd1=Math.abs(dist)<=sd1;
+    const inSd2=Math.abs(dist)<=sd2&&!inSd1;
+    const bg=inSd1?'rgba(46,160,67,0.15)':inSd2?'rgba(31,111,235,0.12)':'rgba(48,54,61,0.5)';
+    const col=inSd1?'var(--green-l)':inSd2?'var(--blue-l)':'var(--muted)';
+    html+=`<span style="background:${bg};border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;color:${col};">${k}</span>`;
+  });
+  html+=`</div></div>`;
+  ct.innerHTML=html;
+}
+
+// ── Fetch XAUUSD spot price ────────────────────────────
+async function fetchSpotPrice(){
+  const el=(id)=>document.getElementById(id);
+  try{
+    const r=await fetch('https://api.metals.live/v1/spot/gold',{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    // Response: [{gold: 1234.56}] or {gold: 1234.56}
+    const price=Array.isArray(d)?d[0]?.gold:d?.gold;
+    if(!price||isNaN(price))throw new Error('no price');
+    vcSpotPrice=price;
+    if(el('vc-spot')){
+      el('vc-spot').textContent='$'+price.toFixed(2);
+      el('vc-spot-sub').textContent='metals.live';
+    }
+    const fut=parsedData.intraday?.futuresPrice;
+    if(fut&&el('vc-diff')){
+      const diff=fut-price;
+      el('vc-diff').textContent=(diff>=0?'+':'')+diff.toFixed(2);
+      el('vc-diff').className='metric-value '+(diff>=0?'val-gold':'val-red');
+      el('vc-diff-sub').textContent=diff>=0?'Contango (ปกติ — GC > Spot)':'Backwardation (GC < Spot)';
+    }
+  }catch(e){
+    if(el('vc-spot')){el('vc-spot').textContent='N/A';el('vc-spot-sub').textContent='Unavailable';}
+    if(el('vc-diff')){el('vc-diff').textContent='—';el('vc-diff-sub').textContent='ดูเองจาก chart';}
+  }
+}
+
+// ── Init TradingView XAUUSD widget ─────────────────────
+function initTVWidget(){
+  if(vcTVLoaded)return;
+  vcTVLoaded=true;
+  const container=document.getElementById('tradingview_xauusd');
+  if(!container)return;
+  const script=document.createElement('script');
+  script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  script.async=true;
+  script.innerHTML=JSON.stringify({
+    autosize:true,
+    symbol:'OANDA:XAUUSD',
+    interval:'15',
+    timezone:'Asia/Bangkok',
+    theme:'dark',
+    style:'1',
+    locale:'th',
+    hide_side_toolbar:false,
+    allow_symbol_change:true,
+    calendar:false,
+    studies:[],
+    container_id:'tradingview_xauusd',
+    backgroundColor:'rgba(13,17,23,1)',
+    gridColor:'rgba(48,54,61,0.6)'
+  });
+  container.appendChild(script);
+}
+
+
 
 async function init(){
   updateClock();setInterval(updateClock,30000);
