@@ -2206,6 +2206,11 @@ function regimeFromIV(ivPct){
 }
 
 // ── Decision Engine ────────────────────────────────────
+// ── Block trade helpers (25$ grid) ─────────────────────
+function nearestBlock(p,bs=25){return Math.round(p/bs)*bs;}
+function blockAbove(p,bs=25){return Math.ceil((p+0.001)/bs)*bs;}
+function blockBelow(p,bs=25){return Math.floor((p-0.001)/bs)*bs;}
+
 function decideZone(src, gexData, lv){
   const F = src.futuresPrice;
   const O = src.openPrice || F;
@@ -2232,30 +2237,47 @@ function decideZone(src, gexData, lv){
   const sdPos = sd1d > 0 ? distFromOpen / sd1d : 0;
   const absSdPos = Math.abs(sdPos);
 
-  let quadrant, quadrantNote;
+  let quadrant, quadrantNote, zoneLabel;
 
-  // Quadrant determination (which SD zone are we in)
+  // Quadrant determination — 3-tier zone system
+  // ±1σ = Watch (Noise Zone), ±2σ = Action Zone (Recommended), ±3σ = Extreme Zone
   if(longGammaRegime){
     if(absSdPos < 0.5){
-      quadrant='neutral'; quadrantNote='ราคาอยู่ใน Neutral Zone (±0.5σ) · Long Gamma Regime → mean-revert ได้';
-    } else if(sdPos >= 0.5 && sdPos < 1.0){
-      quadrant='upper_watch'; quadrantNote='ราคาเข้าใกล้ +1σ · รอ Call Wall ยืนยัน → Fade หรือ รอ Break';
+      quadrant='neutral';        quadrantNote='Neutral Zone (±0.5σ) · Long Gamma → No-Trade · รอราคาออกจากกลาง';          zoneLabel='Neutral';
+    } else if(sdPos >= 3.0){
+      quadrant='upper_extreme';  quadrantNote='🔥 +3σ Extreme Zone · Long Gamma → Fade แรงสุด · เกิดน้อยมาก';            zoneLabel='🔥 Extreme Zone (+3σ)';
+    } else if(sdPos >= 2.0){
+      quadrant='upper_action_2'; quadrantNote='⭐ +2σ Action Zone · Long Gamma → Fade แนะนำ · Statistical Edge สูง';     zoneLabel='⭐ Action Zone (+2σ)';
     } else if(sdPos >= 1.0){
-      quadrant='upper_action'; quadrantNote='ราคาทะลุ +1σ · Long Gamma → ดีลเลอร์ขาย → Fade โอกาสสูง';
-    } else if(sdPos <= -0.5 && sdPos > -1.0){
-      quadrant='lower_watch'; quadrantNote='ราคาเข้าใกล้ −1σ · Put Wall ใกล้ → รอยืนยัน';
+      quadrant='upper_action';   quadrantNote='⚠ +1σ Watch Zone · Long Gamma → Noise สูง · Fade ได้แต่ Edge ต่ำกว่า';   zoneLabel='⚠ Watch Zone (+1σ)';
     } else {
-      quadrant='lower_action'; quadrantNote='ราคาทะลุ −1σ · Long Gamma → ดีลเลอร์ซื้อ → Fade โอกาสสูง';
+      quadrant='upper_watch';    quadrantNote='ราคาเข้า +0.5–1σ · รอยืนยันก่อน Fade';                                    zoneLabel='Caution (0.5σ)';
+    }
+    if(sdPos <= -3.0){
+      quadrant='lower_extreme';  quadrantNote='🔥 -3σ Extreme Zone · Long Gamma → Fade แรงสุด · เกิดน้อยมาก';            zoneLabel='🔥 Extreme Zone (-3σ)';
+    } else if(sdPos <= -2.0){
+      quadrant='lower_action_2'; quadrantNote='⭐ -2σ Action Zone · Long Gamma → Fade แนะนำ · Statistical Edge สูง';     zoneLabel='⭐ Action Zone (-2σ)';
+    } else if(sdPos <= -1.0){
+      quadrant='lower_action';   quadrantNote='⚠ -1σ Watch Zone · Long Gamma → Noise สูง · Fade ได้แต่ Edge ต่ำกว่า';   zoneLabel='⚠ Watch Zone (-1σ)';
+    } else if(sdPos <= -0.5){
+      quadrant='lower_watch';    quadrantNote='ราคาเข้า -0.5–1σ · รอยืนยันก่อน Fade';                                    zoneLabel='Caution (-0.5σ)';
     }
   } else {
     if(absSdPos < 0.5){
-      quadrant='neutral_neg'; quadrantNote='Neutral Zone · Short Gamma → ระวัง ตลาดอาจ vol ได้';
+      quadrant='neutral_neg'; quadrantNote='Neutral Zone · Short Gamma → ระวัง ตลาดอาจ vol ได้'; zoneLabel='Neutral (SG)';
     } else if(sdPos > 0){
-      quadrant='upper_trend'; quadrantNote='Short Gamma Uptrend → Dealer ซื้อตาม → Momentum ขึ้น';
+      quadrant='upper_trend'; quadrantNote='Short Gamma Uptrend → Dealer ซื้อตาม → Momentum ขึ้น'; zoneLabel='Momentum ↑';
     } else {
-      quadrant='lower_trend'; quadrantNote='Short Gamma Downtrend → Dealer ขายตาม → Momentum ลง';
+      quadrant='lower_trend'; quadrantNote='Short Gamma Downtrend → Dealer ขายตาม → Momentum ลง'; zoneLabel='Momentum ↓';
     }
   }
+
+  // ── IV Divergence detection ──────────────────────────
+  const _mk = currentMode==='oi'?'oi':'intraday';
+  const _prevF  = previousData[_mk]?.futuresPrice || null;
+  const _prevIV = previousData[_mk]?.atmIV || null;
+  const ivDivBearish = _prevF!=null && _prevIV!=null && F>_prevF && iv<_prevIV && distFromOpen>0;
+  const ivDivBullish = _prevF!=null && _prevIV!=null && F<_prevF && iv>_prevIV && distFromOpen<0;
 
   let score=50; const reasons=[];
   if(longGammaRegime){score+=10;reasons.push({icon:'🟢',text:`Long Gamma (Net GEX +${totalGex.toFixed(1)}M) → ตลาดดูดราคากลับ`});}
@@ -2267,55 +2289,99 @@ function decideZone(src, gexData, lv){
     else{score+=5;reasons.push({icon:'🔻',text:`IV ลด ${Math.abs(ivChg).toFixed(2)}%`});}
   }
   reasons.push({icon:'📏',text:`ราคาอยู่ที่ ${sdPos>=0?'+':''}${sdPos.toFixed(2)}σ จาก Open ($${O.toFixed(2)})`});
+  // IV Divergence signal
+  if(ivDivBearish){
+    score-=12;
+    reasons.push({icon:'🚨',text:`IV Divergence — ราคาขึ้น +$${(F-_prevF).toFixed(1)} แต่ IV ลด ${(_prevIV-iv).toFixed(2)}% → ตลาดไม่กลัว → สัญญาณ Short`,div:true});
+  }
+  if(ivDivBullish){
+    reasons.push({icon:'⚠️',text:`IV Divergence — ราคาลง -$${(_prevF-F).toFixed(1)} แต่ IV ขึ้น ${(iv-_prevIV).toFixed(2)}% → ระวัง Cascade / Forced Sell`,div:true});
+  }
 
   let entry=null,stop=null,target=null,entrySub='',stopSub='',targetSub='';
   let verdict='NEUTRAL',icon='⏳',action='',tagline='',verdictClass='neutral';
   let winProb='—';
 
+  // Block trade grid: entry/stop/target snapped to 25$ blocks
   if(longGammaRegime){
-    if(quadrant==='upper_action'||quadrant==='upper_watch'){
+    // ── UPPER SIDE ────────────────────────────────────────
+    if(quadrant==='upper_extreme'){
       verdict='SHORT';icon='🔴';verdictClass='short';
-      action='Fade การขึ้น — Sell near +1σ / Call Wall';
-      tagline='Long Gamma → Dealer ขายตาม → กลับมา Open';
-      entry=cw?Math.min(F,cw):upTrigger; stop=entry+sd1d*0.5; target=O;
-      entrySub=cw?`Call Wall $${cw}`:`+1σ $${upTrigger.toFixed(0)}`;
-      stopSub='+0.5σ_1D above'; targetSub='Open (mean-revert)';
-      winProb='~73%'; score=Math.min(score+15,95);
-    } else if(quadrant==='lower_action'||quadrant==='lower_watch'){
+      action='🔥 Extreme Fade — Short ±3σ (High Conviction · เกิดน้อยมาก)';
+      tagline='Long Gamma → ดีลเลอร์ต้องขายหนัก → กลับแรง';
+      entry=blockAbove(F); stop=entry+50; target=nearestBlock(O);
+      entrySub=`Block $${entry} (±3σ Extreme)`; stopSub=`$${stop} (+2 blocks)`; targetSub=`Block $${target} (Open)`;
+      winProb='~85%'; score=Math.min(score+25,98);
+    } else if(quadrant==='upper_action_2'){
+      verdict='SHORT';icon='🔴';verdictClass='short';
+      action='⭐ Recommended Fade — Short ±2σ Action Zone';
+      tagline='Long Gamma → Statistical Edge สูง → กลับหา Open';
+      entry=blockAbove(F); stop=entry+25; target=nearestBlock(O);
+      entrySub=`Block $${entry} (±2σ Action Zone)`; stopSub=`$${stop} (+1 block)`; targetSub=`Block $${target} (Open)`;
+      winProb='~78%'; score=Math.min(score+20,95);
+    } else if(quadrant==='upper_action'){
+      verdict='SHORT';icon='🔴';verdictClass='short';
+      action='Fade ±1σ — Watch Zone (Noise สูงกว่า ±2σ · ระวัง)';
+      tagline='Long Gamma → Fade ได้ แต่ Edge ต่ำกว่า Action Zone';
+      entry=blockAbove(F); stop=entry+25; target=nearestBlock(O);
+      entrySub=`Block $${entry} (±1σ Watch)`; stopSub=`$${stop} (+1 block)`; targetSub=`Block $${target} (Open)`;
+      winProb='~58%'; score=Math.min(score+8,78);
+    // ── LOWER SIDE ────────────────────────────────────────
+    } else if(quadrant==='lower_extreme'){
       verdict='LONG';icon='🟢';verdictClass='long';
-      action='Fade การลง — Buy near −1σ / Put Wall';
-      tagline='Long Gamma → Dealer ซื้อตาม → กลับมา Open';
-      entry=pw?Math.max(F,pw):dnTrigger; stop=entry-sd1d*0.5; target=O;
-      entrySub=pw?`Put Wall $${pw}`:`−1σ $${dnTrigger.toFixed(0)}`;
-      stopSub='−0.5σ_1D below'; targetSub='Open (mean-revert)';
-      winProb='~73%'; score=Math.min(score+15,95);
+      action='🔥 Extreme Fade — Long ±3σ (High Conviction · เกิดน้อยมาก)';
+      tagline='Long Gamma → ดีลเลอร์ต้องซื้อหนัก → กลับแรง';
+      entry=blockBelow(F); stop=entry-50; target=nearestBlock(O);
+      entrySub=`Block $${entry} (±3σ Extreme)`; stopSub=`$${stop} (-2 blocks)`; targetSub=`Block $${target} (Open)`;
+      winProb='~85%'; score=Math.min(score+25,98);
+    } else if(quadrant==='lower_action_2'){
+      verdict='LONG';icon='🟢';verdictClass='long';
+      action='⭐ Recommended Fade — Long ±2σ Action Zone';
+      tagline='Long Gamma → Statistical Edge สูง → กลับหา Open';
+      entry=blockBelow(F); stop=entry-25; target=nearestBlock(O);
+      entrySub=`Block $${entry} (±2σ Action Zone)`; stopSub=`$${stop} (-1 block)`; targetSub=`Block $${target} (Open)`;
+      winProb='~78%'; score=Math.min(score+20,95);
+    } else if(quadrant==='lower_action'){
+      verdict='LONG';icon='🟢';verdictClass='long';
+      action='Fade ±1σ — Watch Zone (Noise สูงกว่า ±2σ · ระวัง)';
+      tagline='Long Gamma → Fade ได้ แต่ Edge ต่ำกว่า Action Zone';
+      entry=blockBelow(F); stop=entry-25; target=nearestBlock(O);
+      entrySub=`Block $${entry} (±1σ Watch)`; stopSub=`$${stop} (-1 block)`; targetSub=`Block $${target} (Open)`;
+      winProb='~58%'; score=Math.min(score+8,78);
     } else {
       verdict='WAIT';icon='⏳';verdictClass='neutral';
-      action='รอราคาเข้าใกล้ขอบ Zone'; tagline='Long Gamma — Edge ต่ำตอนนี้'; winProb='—'; score=50;
+      action='รอราคาออกจาก Neutral Zone (±0.5σ)'; tagline='Long Gamma — No-Trade Zone · ยังไม่มี Edge'; winProb='—'; score=50;
     }
   } else {
     if(quadrant==='upper_trend'){
       verdict='LONG';icon='🟢';verdictClass='long';
-      action='Momentum Long — Short Gamma';tagline='Dealer ซื้อตาม → trend ขึ้น';
-      entry=F; stop=F-sd1d*0.5; target=cw||(F+sd1d);
-      entrySub='Current price'; stopSub='−0.5σ_1D'; targetSub=cw?`Call Wall $${cw}`:'';
+      action='Momentum Long — Short Gamma ตามขึ้น Block ต่อ Block';
+      tagline='Dealer ซื้อตาม → ไล่ทีละ Block 25$';
+      entry = blockAbove(F);            // breakout above current block
+      stop  = blockBelow(F);            // block below current
+      target= cw ? blockBelow(cw) : blockAbove(entry); // just under Call Wall block
+      entrySub=`Block $${entry} (breakout)`; stopSub=`Block $${stop}`; targetSub=cw?`Block $${target} (ใต้ Call Wall $${cw})`:`Block $${target}`;
       winProb='~55%'; score=Math.max(score+5,40);
     } else if(quadrant==='lower_trend'){
       verdict='SHORT';icon='🔴';verdictClass='short';
-      action='Momentum Short — Short Gamma';tagline='Dealer ขายตาม → trend ลง';
-      entry=F; stop=F+sd1d*0.5; target=pw||(F-sd1d);
-      entrySub='Current price'; stopSub='+0.5σ_1D'; targetSub=pw?`Put Wall $${pw}`:'';
+      action='Momentum Short — Short Gamma ตามลง Block ต่อ Block';
+      tagline='Dealer ขายตาม → ไล่ทีละ Block 25$';
+      entry = blockBelow(F);            // breakdown below current block
+      stop  = blockAbove(F);            // block above current
+      target= pw ? blockAbove(pw) : blockBelow(entry); // just above Put Wall block
+      entrySub=`Block $${entry} (breakdown)`; stopSub=`Block $${stop}`; targetSub=pw?`Block $${target} (เหนือ Put Wall $${pw})`:`Block $${target}`;
       winProb='~55%'; score=Math.max(score+5,40);
     } else {
       verdict='WAIT';icon='⏳';verdictClass='neutral';
-      action='รอทิศทาง — Short Gamma กลาง';tagline='Short Gamma — Spike ได้ทั้งสองทาง';winProb='—';score=45;
+      action='รอทิศทาง — Short Gamma กลาง';tagline='Short Gamma — Spike ได้ทั้งสองทาง รอ Block Break';winProb='—';score=45;
     }
   }
   let rrVal=null;
   if(entry&&stop&&target){const sd=Math.abs(entry-stop),pd=Math.abs(target-entry);rrVal=sd>0?pd/sd:null;}
   score=Math.max(0,Math.min(100,Math.round(score)));
   return{verdict,icon,action,tagline,verdictClass,score,reasons,entry,stop,target,
-         entrySub,stopSub,targetSub,winProb,rrVal,sd1d,sd2d,longGammaRegime,quadrant,quadrantNote,F,O,sdPos,iv};
+         entrySub,stopSub,targetSub,winProb,rrVal,sd1d,sd2d,longGammaRegime,quadrant,quadrantNote,
+         zoneLabel,ivDivBearish,ivDivBullish,F,O,sdPos,iv};
 }
 
 // ── Decision Engine renderer ────────────────────────────
@@ -2348,9 +2414,14 @@ function renderDecisionEngine(d,src){
   const acc=parseFloat(document.getElementById('zp-account')?.value)||10000;
   const risk=parseFloat(document.getElementById('zp-risk')?.value)||1;
   if(d.entry&&d.stop){const sd=Math.abs(d.entry-d.stop);if(sd>0)document.getElementById('zde-lots').textContent=((acc*(risk/100))/(sd*100)).toFixed(3);}
-  document.getElementById('zde-reasons').innerHTML=d.reasons.map(r=>`<div class="zde-reason"><span class="zde-rmark">${r.icon}</span><span class="zde-rtxt">${r.text}</span></div>`).join('');
+  // IV Divergence banner
+  let divBanner='';
+  if(d.ivDivBearish) divBanner=`<div style="background:rgba(218,54,51,.18);border:1px solid rgba(218,54,51,.6);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:#f85149;">🚨 <strong>IV Divergence</strong> — ราคาขึ้นแต่ IV ลด → ตลาดไม่กลัว → <strong>Short Opportunity</strong></div>`;
+  else if(d.ivDivBullish) divBanner=`<div style="background:rgba(240,136,62,.15);border:1px solid rgba(240,136,62,.6);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:#f0883e;">⚠️ <strong>IV Divergence</strong> — ราคาลงแต่ IV ขึ้น → ระวัง Cascade Risk</div>`;
+  const reasonsEl=document.getElementById('zde-reasons');
+  if(reasonsEl) reasonsEl.innerHTML=divBanner+d.reasons.map(r=>`<div class="zde-reason${r.div?' zde-reason-div':''}"><span class="zde-rmark">${r.icon}</span><span class="zde-rtxt">${r.text}</span></div>`).join('');
   document.getElementById('zde-meta').innerHTML=
-    `<span class="zde-chip">σ_1D:$${d.sd1d.toFixed(1)}</span><span class="zde-chip">Pos:${d.sdPos>=0?'+':''}${d.sdPos.toFixed(2)}σ</span><span class="zde-chip">IV:${d.iv.toFixed(2)}%</span><span class="zde-chip ${d.longGammaRegime?'green':'red'}">${d.longGammaRegime?'Long Gamma':'Short Gamma'}</span>`;
+    `<span class="zde-chip">σ_1D:$${d.sd1d.toFixed(1)}</span><span class="zde-chip">Pos:${d.sdPos>=0?'+':''}${d.sdPos.toFixed(2)}σ</span><span class="zde-chip">IV:${d.iv.toFixed(2)}%</span><span class="zde-chip ${d.longGammaRegime?'green':'red'}">${d.longGammaRegime?'Long Gamma':'Short Gamma'}</span>${d.zoneLabel?`<span class="zde-chip" style="background:rgba(139,73,229,.25);color:#b392f0;">${d.zoneLabel}</span>`:''}`;
 }
 
 
@@ -2477,6 +2548,8 @@ function detectSqueeze(parsed, gexRows, lv, sd1d) {
   const half_sd = sd1d * 0.5;
   let callStatus = F >= callWallStrike ? 'fired' : distToCall < half_sd ? 'imminent' : 'armed';
   let putStatus  = F <= putWallStrike  ? 'fired' : distToPut  < half_sd ? 'imminent' : 'armed';
+  // Squeeze target = next significant GEX Wall beyond the triggered wall
+  // (price blasts through Call/Put Wall → crosses LVN/air pocket → hits next wall)
   const callTarget = findNextCluster(gexRows, callWallStrike, 'up');
   const putTarget  = findNextCluster(gexRows, putWallStrike,  'down');
   const callAirPocket = callTarget ? hasAirPocket(gexRows, callWallStrike, callTarget.strike) : true;
@@ -2507,15 +2580,15 @@ function renderSqueezeDetector(sq) {
     ? `<span class="sq-chip red">🔴 Negative GEX — Short Gamma</span>`
     : `<span class="sq-chip green">🟢 Positive GEX — Long Gamma</span>`;
   const callTgtHtml = sq.callTarget
-    ? `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div>
+    ? `<div class="sq-target"><div class="sq-target-label">🎯 Next Wall (Squeeze Target)</div>
        <div class="sq-target-val val-green">$${sq.callTarget.strike}</div>
-       <div style="font-size:10px;color:var(--muted);">+$${(sq.callTarget.strike-sq.callWallStrike).toFixed(0)} from trigger${sq.callAirPocket?' · ⚠ Air Pocket':''}</div></div>`
-    : `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div><div style="font-size:12px;color:var(--red-l);">Air Pocket — ไม่มี cluster ถัดไป</div></div>`;
+       <div style="font-size:10px;color:var(--muted);">+$${(sq.callTarget.strike-sq.callWallStrike).toFixed(0)} จาก Trigger${sq.callAirPocket?' · ⚠ Air Pocket (LVN โล่ง — วิ่งเร็ว)':' · มี GEX กั้นกลาง'}</div></div>`
+    : `<div class="sq-target"><div class="sq-target-label">🎯 Next Wall (Squeeze Target)</div><div style="font-size:12px;color:var(--muted);">⚠ Air Pocket ไม่มี Wall กั้น — ราคาวิ่งได้ไกล</div></div>`;
   const putTgtHtml = sq.putTarget
-    ? `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div>
+    ? `<div class="sq-target"><div class="sq-target-label">🎯 Next Wall (Squeeze Target)</div>
        <div class="sq-target-val val-red">$${sq.putTarget.strike}</div>
-       <div style="font-size:10px;color:var(--muted);">-$${(sq.putWallStrike-sq.putTarget.strike).toFixed(0)} from trigger${sq.putAirPocket?' · ⚠ Air Pocket':''}</div></div>`
-    : `<div class="sq-target"><div class="sq-target-label">🎯 Squeeze Target</div><div style="font-size:12px;color:var(--red-l);">Air Pocket — ไม่มี cluster ถัดไป</div></div>`;
+       <div style="font-size:10px;color:var(--muted);">-$${(sq.putWallStrike-sq.putTarget.strike).toFixed(0)} จาก Trigger${sq.putAirPocket?' · ⚠ Air Pocket (LVN โล่ง — วิ่งเร็ว)':' · มี GEX กั้นกลาง'}</div></div>`
+    : `<div class="sq-target"><div class="sq-target-label">🎯 Next Wall (Squeeze Target)</div><div style="font-size:12px;color:var(--muted);">⚠ Air Pocket ไม่มี Wall กั้น — ราคาวิ่งได้ไกล</div></div>`;
   const callHtml = `<div class="sq-side ${sq.callStatus}">
     <div class="sq-side-title">⬆ CALL SQUEEZE</div>
     <div class="sq-status" style="color:${statusColor[sq.callStatus]}">${statusLabel[sq.callStatus]}</div>
@@ -3057,7 +3130,7 @@ function renderVolChart(parsed){
 
   const labels=rows.map(r=>r.strike.toString());
   const callVols=rows.map(r=>r.call||0);
-  const putVols=rows.map(r=>-(r.put||0));   // negative → bars go down
+  const putVols=rows.map(r=>r.put||0);   // both positive → side-by-side bars
   const volSettle=rows.map(r=>r.volSettle>0?r.volSettle*100:null);
 
   // Compute delta zone strikes
@@ -3166,8 +3239,7 @@ function renderVolChart(parsed){
           callbacks:{
             label(ctx){
               if(ctx.dataset.label==='Vol Settle (%)'){return `Vol: ${ctx.raw?.toFixed(2)}%`;}
-              const v=Math.abs(ctx.raw);
-              return `${ctx.dataset.label}: ${v.toLocaleString()}`;
+              return `${ctx.dataset.label}: ${(ctx.raw||0).toLocaleString()}`;
             }
           }
         }
@@ -3180,8 +3252,9 @@ function renderVolChart(parsed){
         },
         y:{
           stacked:false,
+          min:0,
           ticks:{color:'#8b949e',font:{size:10},
-            callback(v){return Math.abs(v).toLocaleString();}
+            callback(v){return v.toLocaleString();}
           },
           grid:{color:'rgba(48,54,61,0.6)'}
         },
