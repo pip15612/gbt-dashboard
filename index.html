@@ -262,6 +262,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .delta-row:nth-child(odd){background:rgba(255,255,255,.025);}
 .delta-row .ds{flex:0 0 60px;font-weight:700;}
 .delta-row .dt{flex:0 0 18px;color:var(--muted);}
+.delta-row .dt-type{flex:0 0 18px;font-weight:700;}
 .delta-row .dv{font-weight:700;flex:1;text-align:right;}
 .delta-row.up .dv{color:var(--green-l);}
 .delta-row.dn .dv{color:var(--red-l);}
@@ -537,7 +538,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <div class="delta-card" id="delta-card">
       <div class="delta-head">
         <div class="delta-head-title">📊 Call/Put Change vs Previous Snapshot</div>
-        <div class="delta-head-meta" id="delta-meta">โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ</div>
+        <div class="delta-head-meta" id="delta-meta">กำลังโหลด…</div>
       </div>
       <div class="delta-totals" id="delta-totals">
         <div class="zp-out"><div class="zp-out-label">ΔCall Total</div><div class="zp-out-val val-n" id="delta-call-total">—</div></div>
@@ -870,8 +871,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <p><span class="hl-gold">IV</span> คือ <strong>ความผันผวนที่ตลาดคาดการณ์ไว้ในราคา Option</strong> — ไม่ใช่ความผันผวนในอดีต แต่เป็นการมองไปข้างหน้า</p>
         <p>ตัวเลขใน column <code>Vol Settle</code> ใน CSV เป็น <strong>decimal</strong> เช่น 0.1828 = 18.28%</p>
         <p>ตัวเลขใน header2 "Vol: 17.83" เป็น <strong>เปอร์เซ็นต์</strong> โดยตรง</p>
-        <div class="formula">1σ Expected Range (Expiry) = F × σ × √(DTE/252)</div>
-        <p>ตัวอย่าง: F=4540, σ=18.28%, DTE=0.46 → Range = 4540 × 0.1828 × √(0.46/252) ≈ ±<strong>$25</strong></p>
+        <div class="formula">1σ Expected Range (Expiry) = F × σ × √(DTE/365)</div>
+        <p>ตัวอย่าง: F=4540, σ=18.28%, DTE=0.46 → Range = 4540 × 0.1828 × √(0.46/365) ≈ ±<strong>$21</strong></p>
         <div class="tip">💡 IV สูง = ตลาดกังวล ค่า premium แพง / IV ต่ำ = ตลาดสงบ ค่า premium ถูก</div>
       </div>
     </details>
@@ -1021,11 +1022,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <div class="accordion-body">
         <p><span class="hl-purple">1σ Expected Range</span> = ช่วงราคาที่มีโอกาส <strong>68.2%</strong> ที่ราคาจะอยู่ใน range นี้ก่อน Expiry</p>
         <div class="formula">
-          1σ Range (Expiry) = F × σ_ATM × √(DTE / 252)<br>
-          1σ Range (1 Day)  = F × σ_ATM × √(1 / 252)
+          1σ Range (Expiry) = F × σ_ATM × √(DTE / 365)<br>
+          1σ Range (1 Day)  = F × σ_ATM × √(1 / 365)
         </div>
         <p>ตัวอย่าง: F=4540, σ=18%, DTE=5<br>
-        1σ Exp = 4540 × 0.18 × √(5/252) = 4540 × 0.18 × 0.1409 ≈ <strong>±$115</strong><br>
+        1σ Exp = 4540 × 0.18 × √(5/365) = 4540 × 0.18 × 0.1170 ≈ <strong>±$96</strong><br>
         ราคามีโอกาส 68% อยู่ระหว่าง 4,425–4,655 ก่อน Expiry</p>
         <div class="tip">💡 ขาย Options ที่อยู่นอก 1σ มีโอกาสกำไรถึง 68% ตาม Theory (แต่ต้องดู GEX ประกอบด้วย)</div>
       </div>
@@ -1035,7 +1036,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <summary>📊 2σ Range คืออะไร?</summary>
       <div class="accordion-body">
         <p><span class="hl-purple">2σ Range</span> = ช่วงราคาที่มีโอกาส <strong>95.4%</strong> ที่ราคาจะอยู่ใน range นี้</p>
-        <div class="formula">2σ Range = 2 × (F × σ_ATM × √(DTE / 252))</div>
+        <div class="formula">2σ Range = 2 × (F × σ_ATM × √(DTE / 365))</div>
         <div class="tip">💡 ราคาที่หลุด 2σ ถือว่า "ผิดปกติมาก" — มักเกิดจาก Event พิเศษ (Fed, War, Panic)</div>
       </div>
     </details>
@@ -1756,11 +1757,19 @@ async function fetchFileAtCommit(file,sha){
 // ── Bangkok helpers ────────────────────────────────────
 const BKK='Asia/Bangkok';
 function nowBKK(){return new Date(new Date().toLocaleString('en-US',{timeZone:BKK}));}
-function sessionDate(){const d=nowBKK();if(d.getHours()<10)d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];}
+
+function sessionDate(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:BKK});// YYYY-MM-DD in BKK
+}
+function sessionStart(){
+  // Session starts at 05:00 BKK each day (UTC+7 = ISO offset +07:00)
+  const d=sessionDate();// YYYY-MM-DD
+  return new Date(`${d}T05:00:00+07:00`);
+}
 function filterToday(list){
-  const today=sessionDate();
-  const t=list.filter(c=>{const d=new Date(c.commit.author.date);return new Date(d.toLocaleString('en-US',{timeZone:BKK})).toISOString().split('T')[0]===today;});
-  return t.length?t:list.slice(0,5);
+  const start=sessionStart();
+  const t=list.filter(c=>new Date(c.commit.author.date)>=start);
+  return t.length?t:list.slice(0,5);// fallback: เช้ามากก่อน pipeline เริ่ม
 }
 function fmtTimeBKK(ds){return new Date(ds).toLocaleTimeString('en-US',{timeZone:BKK,hour:'2-digit',minute:'2-digit',hour12:false});}
 function updateClock(){const b=nowBKK();document.getElementById('bkk-time').textContent=`BKK ${String(b.getHours()).padStart(2,'0')}:${String(b.getMinutes()).padStart(2,'0')}`;}
@@ -1844,21 +1853,38 @@ function mergeComposite(oiParsed,volParsed,a){
 
 // ── Key Levels ─────────────────────────────────────────
 function calcLevels(rows,F){
-  // Call Wall: max positive GEX among strikes AT or ABOVE current price
-  // Put Wall:  max negative GEX among strikes AT or BELOW current price
-  // This ensures Call squeeze always means "price goes UP" and Put squeeze means "price goes DOWN"
-  const above=rows.filter(r=>r.strike>=F), below=rows.filter(r=>r.strike<=F);
-  const callWall = above.length
-    ? above.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null})
-    : rows.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null}); // fallback: global max
-  const putWall = below.length
-    ? below.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null})
-    : rows.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null}); // fallback: global min
-  // Gamma flip lines (zero-crossing nearest to ATM)
-  const aboveFlip=rows.filter(r=>r.strike>=F), belowFlip=rows.filter(r=>r.strike<F);
+  // Call Wall: largest POSITIVE GEX strike at or above ATM (dealer long gamma on calls = resistance)
+  // Put Wall:  largest NEGATIVE GEX strike at or below ATM (dealer long gamma on puts = support)
+  // Only count wall if GEX has the correct sign — null if regime is fully inverted
+  const above=rows.filter(r=>r.strike>=F);
+  const below=rows.filter(r=>r.strike<=F);
+
+  const posAbove=above.filter(r=>r.gex>0);
+  const negBelow=below.filter(r=>r.gex<0);
+
+  // Call Wall = max positive GEX above; fallback to global max positive if none above
+  const posAll=rows.filter(r=>r.gex>0);
+  const callWall = posAbove.length
+    ? posAbove.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null})
+    : posAll.length
+      ? posAll.reduce((b,r)=>r.gex>b.gex?r:b,{gex:-Infinity,strike:null})
+      : {gex:0,strike:null}; // no positive GEX at all (full short-gamma regime)
+
+  // Put Wall = most negative GEX below; fallback to global most negative if none below
+  const negAll=rows.filter(r=>r.gex<0);
+  const putWall = negBelow.length
+    ? negBelow.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null})
+    : negAll.length
+      ? negAll.reduce((b,r)=>r.gex<b.gex?r:b,{gex:Infinity,strike:null})
+      : {gex:0,strike:null}; // no negative GEX at all (full long-gamma regime)
+
+  // Gamma flip: nearest zero-crossing above and below ATM
+  const aboveFlip=rows.filter(r=>r.strike>=F);
+  const belowFlip=rows.filter(r=>r.strike<F);
   let flipAbove=null,flipBelow=null;
   for(let i=0;i<aboveFlip.length-1;i++)if(aboveFlip[i].gex*aboveFlip[i+1].gex<=0){flipAbove=aboveFlip[i];break;}
   for(let i=belowFlip.length-1;i>0;i--)if(belowFlip[i].gex*belowFlip[i-1].gex<=0){flipBelow=belowFlip[i];break;}
+
   const dgcWall=callWall.strike&&putWall.strike?(callWall.strike+putWall.strike)/2:null;
   return{callWall,putWall,flipAbove,flipBelow,dgcWall};
 }
@@ -1866,9 +1892,9 @@ function calcLevels(rows,F){
 // ── Expected Range ─────────────────────────────────────
 function calcRange(F,sigma_pct,dte){
   const sig=sigma_pct/100;
-  const r1exp=F*sig*Math.sqrt(dte/252);
+  const r1exp=F*sig*Math.sqrt(dte/365);
   const r2exp=2*r1exp;
-  const r1day=F*sig*Math.sqrt(1/252);
+  const r1day=F*sig*Math.sqrt(1/365);
   return{r1exp,r2exp,r1day,lo1:F-r1exp,hi1:F+r1exp,lo2:F-r2exp,hi2:F+r2exp,lo1d:F-r1day,hi1d:F+r1day};
 }
 
@@ -2229,7 +2255,7 @@ function decideZone(src, gexData, lv, openPriceRef){
   const futChg = src.futChg;
   if(!F || !O || !dte || !iv) return null;
   const sig = iv/100;
-  const sd1d = O * sig * Math.sqrt(1/252);
+  const sd1d = O * sig * Math.sqrt(1/365);
   const sd2d = 2 * sd1d;
   const upTrigger = O + sd1d;
   const dnTrigger = O - sd1d;
@@ -2467,10 +2493,10 @@ function renderSnapshotDelta(delta,mode){
   const dnList=document.getElementById('delta-dn-list');
   const metaEl=document.getElementById('delta-meta');
   if(!delta){
-    const msg='<div style="color:var(--muted);font-size:11px;padding:8px;">โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ</div>';
+    const msg='<div style="color:var(--muted);font-size:11px;padding:8px;">—</div>';
     if(upList)upList.innerHTML=msg;
     if(dnList)dnList.innerHTML=msg;
-    if(metaEl)metaEl.textContent='โหลด snapshot ที่ 2 เพื่อเปรียบเทียบ';
+    if(metaEl)metaEl.textContent='Snapshot เก่าสุด — ไม่มีข้อมูลก่อนหน้าให้เปรียบเทียบ';
     return;
   }
   const ctEl=document.getElementById('delta-call-total');
@@ -2479,27 +2505,32 @@ function renderSnapshotDelta(delta,mode){
   if(ctEl){ctEl.textContent=`${delta.callTotal>=0?'+':''}${delta.callTotal.toLocaleString()}`;ctEl.className=`zp-out-val ${delta.callTotal>=0?'val-green':'val-red'}`;}
   if(ptEl){ptEl.textContent=`${delta.putTotal>=0?'+':''}${delta.putTotal.toLocaleString()}`;ptEl.className=`zp-out-val ${delta.putTotal>=0?'val-red':'val-green'}`;}
   if(qdEl){
-    const cD=delta.callTotal>0&&delta.callTotal>Math.abs(delta.putTotal);
-    const pD=delta.putTotal>0&&delta.putTotal>Math.abs(delta.callTotal);
-    if(cD){qdEl.textContent='🟢 Call Build-up';qdEl.className='zp-out-val val-green';}
-    else if(pD){qdEl.textContent='🔴 Put Build-up';qdEl.className='zp-out-val val-red';}
-    else{qdEl.textContent='⚖ Mixed';qdEl.className='zp-out-val val-n';}
+    const cUp=delta.callTotal>0, pUp=delta.putTotal>0;
+    const cDn=delta.callTotal<0, pDn=delta.putTotal<0;
+    const cDom=Math.abs(delta.callTotal)>Math.abs(delta.putTotal);
+    if(cUp&&pDn)      {qdEl.textContent='🟢 Call Build / Put Unwind';qdEl.className='zp-out-val val-green';}
+    else if(pUp&&cDn) {qdEl.textContent='🔴 Put Build / Call Unwind';qdEl.className='zp-out-val val-red';}
+    else if(cUp&&pUp) {qdEl.textContent=cDom?'📈 Call > Put Build-up':'📈 Put > Call Build-up';qdEl.className='zp-out-val val-gold';}
+    else if(cDn&&pDn) {qdEl.textContent='⬇ Both Unwind — Position Exit';qdEl.className='zp-out-val val-n';}
+    else              {qdEl.textContent='⚖ Mixed';qdEl.className='zp-out-val val-n';}
   }
   try{
     const mk=mode==='oi'?'oi':'intraday';
     const curr=currentMeta[mk]?.date,prev=previousMeta[mk]?.date;
     if(prev&&curr){
       const dt=(new Date(curr)-new Date(prev))/60000;
-      if(metaEl)metaEl.textContent=`${mode==='intraday'?'Intraday Volume':'Open Interest'} · ${fmtTimeBKK(prev)} → ${fmtTimeBKK(curr)} (Δ ${dt.toFixed(0)} นาที)`;
+      if(metaEl)metaEl.textContent=`${mode==='intraday'?'Intraday Volume':'Open Interest'} · ${fmtTimeBKK(prev)} → ${fmtTimeBKK(curr)} (Δ ${Math.abs(dt).toFixed(0)} นาที)`;
     }
   }catch(e){}
   const fmt=x=>{
-    const tcls=x.type==='C'?'val-green':'val-red';
+    // Use dt-type (no muted override) for C/P label; dt for the "→ now" muted text
+    const typeColor=x.type==='C'?'var(--green-l)':'var(--red-l)';
     const sign=x.delta>=0?'+':''; const arrow=x.delta>=0?'▲':'▼';
     return `<div class="delta-row ${x.delta>=0?'up':'dn'}">
-      <span class="ds">$${x.strike}</span><span class="dt ${tcls}">${x.type}</span>
+      <span class="ds">$${x.strike}</span>
+      <span class="dt-type" style="color:${typeColor};">${x.type}</span>
       <span class="dv">${arrow} ${sign}${x.delta.toLocaleString()}</span>
-      <span class="dt" style="font-size:10px;color:var(--muted);">→ ${x.now.toLocaleString()}</span></div>`;
+      <span class="dt" style="font-size:10px;">→ ${x.now.toLocaleString()}</span></div>`;
   };
   if(upList)upList.innerHTML=delta.topUp.length?delta.topUp.map(fmt).join(''):'<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการเพิ่ม</div>';
   if(dnList)dnList.innerHTML=delta.topDown.length?delta.topDown.map(fmt).join(''):'<div style="color:var(--muted);font-size:11px;padding:8px;">ไม่มีการลด</div>';
@@ -2794,7 +2825,7 @@ function renderAll(src){
   const refS = firstOfDay[modeKeyS] || src;
   const FopenS = refS.openPrice || refS.futuresPrice || src.futuresPrice;
   const refIVS = refS.atmIV || src.atmIV;
-  const sd1dS = (FopenS && refIVS) ? FopenS * (refIVS/100) * Math.sqrt(1/252) : 0;
+  const sd1dS = (FopenS && refIVS) ? FopenS * (refIVS/100) * Math.sqrt(1/365) : 0;
   const sq = detectSqueeze(src, gexData.rows, lv, sd1dS);
   renderSqueezeDetector(sq);
   // ─────────────────────────────────────────────────────
@@ -2876,7 +2907,29 @@ function renderSnaps(list,mode){
 }
 async function selectSnap(idx,mode){
   document.querySelectorAll('.snap-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
-  await loadSnapshot(idx,mode);
+
+  const list=commits[mode];
+  const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
+
+  // Load selected snapshot as current
+  const raw=await fetchFileAtCommit(file,list[idx].sha);
+  parsedData[mode]=parseGBT(raw);
+  currentMeta[mode]={sha:list[idx].sha,date:list[idx].commit.author.date};
+  document.getElementById('freshness').textContent=`Snapshot: ${fmtTimeBKK(list[idx].commit.author.date)} BKK`;
+
+  // Always load idx+1 (chronologically PREVIOUS snapshot) as the comparison baseline
+  // list is newest-first → idx+1 = one step older = correct previous
+  if(list[idx+1]){
+    try{
+      const rawPrev=await fetchFileAtCommit(file,list[idx+1].sha);
+      previousData[mode]=parseGBT(rawPrev);
+      previousMeta[mode]={sha:list[idx+1].sha,date:list[idx+1].commit.author.date};
+    }catch(e){previousData[mode]=null;previousMeta[mode]=null;}
+  }else{
+    // Oldest snapshot — no previous available
+    previousData[mode]=null;previousMeta[mode]=null;
+  }
+
   if(currentMode===mode)renderAll(parsedData[mode]);
   else if(currentMode==='composite'){
     const src=mergeComposite(parsedData.oi,parsedData.intraday,alpha);
@@ -2902,11 +2955,12 @@ async function setAnchor(idx,mode){
   if(anchorIdx[mode]===idx){
     // Toggle OFF — revert to auto (first of day)
     anchorIdx[mode]=null;
-    // Reload actual first-of-day snapshot
     const firstIdx=list.length-1;
     try{
       const rawFirst=await fetchFileAtCommit(file,list[firstIdx].sha);
-      firstOfDay[mode]=parseGBT(rawFirst);
+      const parsed=parseGBT(rawFirst);
+      // Auto mode: openPrice = futuresPrice - futChg = previous settle (unchanged all day)
+      firstOfDay[mode]=parsed;
       const t=fmtTimeBKK(list[firstIdx].commit.author.date);
       updateAnchorLabel(t,false);
     }catch(e){firstOfDay[mode]=null;}
@@ -2915,7 +2969,11 @@ async function setAnchor(idx,mode){
     anchorIdx[mode]=idx;
     try{
       const raw=await fetchFileAtCommit(file,list[idx].sha);
-      firstOfDay[mode]=parseGBT(raw);
+      const parsed=parseGBT(raw);
+      // Manual pin: use futuresPrice AT that moment as SD anchor
+      // (not openPrice = prev settle which is same across all snapshots)
+      parsed.openPrice=parsed.futuresPrice;
+      firstOfDay[mode]=parsed;
       const t=fmtTimeBKK(list[idx].commit.author.date);
       updateAnchorLabel(t,true);
     }catch(e){anchorIdx[mode]=null;}
@@ -2938,7 +2996,7 @@ async function ensureMode(mode){
     const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
     const row=document.getElementById('snapshot-row');
     try{
-      const all=await fetchCommits(file,60);
+      const all=await fetchCommits(file,100);
       if(!all||!all.length){
         row.innerHTML=`<span style="color:var(--gold-l);font-size:12px;">⚠ ยังไม่มี commit สำหรับ ${file}</span>`;return;
       }
@@ -2963,6 +3021,45 @@ async function ensureMode(mode){
   }
 }
 
+// ── Soft refresh (auto every 5 min) — preserves pin 📌 and sessionIVs ──────
+async function softRefresh(){
+  const modes=currentMode==='composite'?['intraday','oi']:[currentMode==='oi'?'oi':'intraday'];
+  for(const mode of modes){
+    const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
+    try{
+      const all=await fetchCommits(file,100);// fetch more to cover full day
+      if(!all||!all.length)continue;
+      const today=filterToday(all);
+      if(!today.length)continue;
+
+      // Preserve pin: remember pinned SHA before replacing list
+      const pinnedSha=anchorIdx[mode]!=null?commits[mode][anchorIdx[mode]]?.sha:null;
+      commits[mode]=today;
+      // Re-locate pinned SHA in new list (index may have shifted)
+      if(pinnedSha){
+        const newIdx=today.findIndex(c=>c.sha===pinnedSha);
+        anchorIdx[mode]=newIdx>=0?newIdx:null;
+        if(newIdx<0){firstOfDay[mode]=null;}// pin SHA gone (very unlikely), reset to auto
+      }
+      if(mode===currentMode||currentMode==='composite')renderSnaps(today,mode);
+
+      // Ensure firstOfDay is loaded (earliest commit = last in newest-first list)
+      if(!firstOfDay[mode]&&today.length>0){
+        const firstIdx=today.length-1;
+        const rawFirst=await fetchFileAtCommit(file,today[firstIdx].sha);
+        firstOfDay[mode]=parseGBT(rawFirst);
+        if(mode===currentMode&&anchorIdx[mode]===null)
+          updateAnchorLabel(fmtTimeBKK(today[firstIdx].commit.author.date),false);
+      }
+      // Load latest snapshot (index 0)
+      await loadSnapshot(0,mode);
+    }catch(e){console.warn('softRefresh',mode,e);}
+  }
+  const src=currentMode==='composite'?mergeComposite(parsedData.oi,parsedData.intraday,alpha):parsedData[currentMode];
+  if(src)renderAll(src);
+}
+
+// ── Hard refresh (manual Refresh button) — full reset ──────────────────────
 async function refreshData(){
   const btn=document.getElementById('refresh-btn');
   btn.classList.add('spinning');btn.disabled=true;
@@ -3014,9 +3111,9 @@ function zpCalc(){
     return;
   }
   const sig=ivPct/100;
-  const sd1=F*sig*Math.sqrt(dte/252);
+  const sd1=F*sig*Math.sqrt(dte/365);
   const sd2=2*sd1, sd3=3*sd1;
-  const sd1d=F*sig*Math.sqrt(1/252);
+  const sd1d=F*sig*Math.sqrt(1/365);
   const zones=[
     {label:'+3σ',  price:F+sd3,  cls:'zone-3', desc:'Extreme — Reversion แรงมาก (0.3%)'},
     {label:'+2σ',  price:F+sd2,  cls:'zone-2', desc:'Action Zone — รอ Confirmation (5%)'},
@@ -3093,7 +3190,7 @@ function zpTargetCalc(){
   const nearest=zpCurrentRows.reduce((b,r)=>Math.abs(r.strike-targetPrice)<Math.abs(b.strike-targetPrice)?r:b,zpCurrentRows[0]);
   const vol=nearest.volSettle;
   if(!vol){clearOutputs();return;}
-  const move=targetPrice*vol*Math.sqrt(zpCurrentDTE/252);
+  const move=targetPrice*vol*Math.sqrt(zpCurrentDTE/365);
   document.getElementById('tm-strike').textContent=`$${nearest.strike}`;
   document.getElementById('tm-vol').textContent=`${(vol*100).toFixed(2)}%`;
   document.getElementById('tm-dte').textContent=zpCurrentDTE.toFixed(3);
@@ -3359,9 +3456,9 @@ function updateVCMetrics(parsed){
   const openF=(firstOfDay['intraday']||parsed).openPrice||parsed.openPrice||F;
   const sig=parsed.atmIV/100;
   const dte=parsed.dte;
-  const sd1=(openF*sig*Math.sqrt(dte/252));
+  const sd1=(openF*sig*Math.sqrt(dte/365));
   const sd2=2*sd1;
-  const sd1d=openF*sig*Math.sqrt(1/252);
+  const sd1d=openF*sig*Math.sqrt(1/365);
 
   const el=(id)=>document.getElementById(id);
   if(el('vc-futures')){el('vc-futures').textContent='$'+F.toFixed(2);el('vc-futures-sub').textContent='Contract: GC / OG';}
@@ -3391,7 +3488,7 @@ function renderSDLevels(parsed){
   const openF=(firstOfDay['intraday']||parsed).openPrice||parsed.openPrice||F;
   const sig=parsed.atmIV/100;
   const dte=parsed.dte;
-  const sd1=openF*sig*Math.sqrt(dte/252);
+  const sd1=openF*sig*Math.sqrt(dte/365);
   const sd2=2*sd1;
   const sd3=3*sd1;
 
@@ -3419,7 +3516,7 @@ function renderSDLevels(parsed){
   html+=row('3σ Range',openF+sd3,openF-sd3,'var(--purple-l)');
   html+=row('2σ Range',openF+sd2,openF-sd2,'var(--blue-l)');
   html+=row('1σ Range',openF+sd1,openF-sd1,'var(--green-l)');
-  html+=row('1σ Daily',openF+openF*sig*Math.sqrt(1/252),openF-openF*sig*Math.sqrt(1/252),'var(--muted)');
+  html+=row('1σ Daily',openF+openF*sig*Math.sqrt(1/365),openF-openF*sig*Math.sqrt(1/365),'var(--muted)');
   html+=`</tbody></table>`;
 
   // Round numbers sub-table
@@ -3500,7 +3597,8 @@ async function init(){
   recoveryCalc();
   await ensureMode('intraday');
   if(parsedData.intraday)renderAll(parsedData.intraday);
-  setInterval(()=>{if(!document.getElementById('setup-overlay').style.display||document.getElementById('setup-overlay').style.display==='none')refreshData();},5*60*1000);
+  // Auto-refresh every 5 min — soft mode preserves 📌 pin and sessionIVs
+  setInterval(()=>{if(!document.getElementById('setup-overlay').style.display||document.getElementById('setup-overlay').style.display==='none')softRefresh();},5*60*1000);
 }
 </script>
 </body>
