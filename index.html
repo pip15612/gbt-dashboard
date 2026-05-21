@@ -56,9 +56,15 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .seg button.active{background:var(--gold);color:#000;}
 .seg button:hover:not(.active){color:var(--text);}
 .snapshot-row{display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0;}
-.snap-btn{background:var(--bg);border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.snap-btn{background:var(--bg);border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:6px 0 0 6px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .snap-btn:hover{border-color:var(--gold);color:var(--text);}
 .snap-btn.active{border-color:var(--gold);background:rgba(210,153,34,.15);color:var(--gold-l);}
+.snap-pair{display:inline-flex;align-items:stretch;}
+.pin-btn{background:var(--surface2);border:1px solid var(--border);border-left:none;color:var(--muted);padding:5px 6px;border-radius:0 6px 6px 0;font-size:11px;cursor:pointer;opacity:0.5;transition:all .15s;line-height:1;}
+.pin-btn:hover{opacity:1;border-color:var(--gold);background:rgba(210,153,34,.12);}
+.pin-btn.pinned{opacity:1;color:#d29922;background:rgba(210,153,34,.25);border-color:rgba(210,153,34,.6);}
+.anchor-label{font-size:10px;color:var(--muted);padding:3px 8px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);white-space:nowrap;display:inline-flex;align-items:center;gap:4px;}
+.anchor-label.manual{color:#d29922;border-color:rgba(210,153,34,.5);background:rgba(210,153,34,.1);}
 .icon-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:6px 11px;border-radius:var(--r);font-size:12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
 .icon-btn:hover{border-color:var(--muted);color:var(--text);}
 .icon-btn.spinning .spin-icon{animation:spin .8s linear infinite;}
@@ -384,6 +390,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <div class="snapshot-row" id="snapshot-row">
       <span style="color:var(--muted);font-size:12px;">Loading…</span>
     </div>
+    <span class="anchor-label" id="anchor-label" title="📌 = SD zone center คลิกปุ่มหมุดข้างๆ snapshot เพื่อเปลี่ยน">📌 —</span>
     <button class="icon-btn" onclick="refreshData()" id="refresh-btn" title="Refresh data">
       <span class="spin-icon">↻</span> Refresh
     </button>
@@ -1678,9 +1685,8 @@ let currentMeta={intraday:null,oi:null};    // {sha, date} of current snapshot
 let gexChart=null, cumChart=null;
 let currentTab='gex';
 let sessionIVs=[];        // ATM IV across snapshots for IV Rank
-let firstOfDay={intraday:null,oi:null};  // earliest snapshot of the session → Zone Planner reference
-let sdAnchor={intraday:null,oi:null};   // SD zone reference — resets every 3 hours
-let sdAnchorTime={intraday:0,oi:0};    // ms timestamp of last sdAnchor update
+let firstOfDay={intraday:null,oi:null};  // SD zone center for the day (auto = first commit, or user-pinned)
+let anchorIdx={intraday:null,oi:null};   // index into commits[] of user-pinned anchor (null = auto)
 let zpCurrentRows=null;   // rows from latest snapshot for vol settle lookup
 let zpCurrentDTE=null;    // current DTE for target-move calc
 
@@ -1886,9 +1892,9 @@ function updateMetrics(parsed,totalGex){
   document.getElementById('m-gex').className=`metric-value ${gM>=0?'val-green':'val-red'}`;
   document.getElementById('m-gex-bias').textContent=gM>0?'Long Gamma — ตลาด Mean-Revert':'Short Gamma — ระวัง Trending';
 
-  // Use 3-hour SD anchor (updates every 3h, not fixed to session open)
+  // SD anchor = first snapshot of the day (fixed open price for the session)
   const modeKey=currentMode==='oi'?'oi':'intraday';
-  const ref=sdAnchor[modeKey]||parsed;
+  const ref=firstOfDay[modeKey]||parsed;
   const Fopen=ref.openPrice||ref.futuresPrice||F;
   const refIV=ref.atmIV||atmIV;
   const refDTE=ref.dte||dte;
@@ -1903,8 +1909,10 @@ function updateMetrics(parsed,totalGex){
     document.getElementById('rb-1day').textContent=`${rng.lo1d.toFixed(2)}–${rng.hi1d.toFixed(2)}`;
     const openEl=document.getElementById('rb-open-label');
     if(openEl){
-      const anchorBKK=sdAnchorTime[modeKey]>0?fmtTimeBKK(new Date(sdAnchorTime[modeKey]).toISOString()):'—';
-      openEl.textContent=`Ref: $${Fopen.toFixed(2)} IV:${refIV?.toFixed(1)}% | Anchor updated ${anchorBKK} BKK`;
+      const mk2=currentMode==='oi'?'oi':'intraday';
+      const isManualPin=anchorIdx[mk2]!==null;
+      openEl.textContent=`${isManualPin?'📌 Manual':'Auto'} SD Ref: $${Fopen.toFixed(2)} IV:${refIV?.toFixed(1)}%`;
+      openEl.style.color=isManualPin?'#d29922':'';
     }
   }
 }
@@ -1928,7 +1936,7 @@ function updateLevels(lv,F){
 function renderGEX(parsed,gexRows,totalGex){
   const{futuresPrice:F}=parsed;
   const modeKey=currentMode==='oi'?'oi':'intraday';
-  const ref=sdAnchor[modeKey]||parsed;
+  const ref=firstOfDay[modeKey]||parsed;
   const Fopen=ref.openPrice||ref.futuresPrice||F;
   const refIV=ref.atmIV||parsed.atmIV;
   const refDTE=ref.dte||parsed.dte;
@@ -1938,7 +1946,7 @@ function renderGEX(parsed,gexRows,totalGex){
   const borders=vals.map(v=>v>=0?'#2ea043':'#da3633');
   const atmIdx=labels.reduce((b,s,i)=>Math.abs(s-F)<Math.abs(labels[b]-F)?i:b,0);
 
-  // Expected range — from 3-hour SD anchor (IV + DTE reset every 3h)
+  // Expected range — from first-of-day snapshot (fixed session open)
   let rng=null;
   if(Fopen&&refIV&&refDTE){
     rng=calcRange(Fopen,refIV,refDTE);
@@ -2211,9 +2219,10 @@ function nearestBlock(p,bs=25){return Math.round(p/bs)*bs;}
 function blockAbove(p,bs=25){return Math.ceil((p+0.001)/bs)*bs;}
 function blockBelow(p,bs=25){return Math.floor((p-0.001)/bs)*bs;}
 
-function decideZone(src, gexData, lv){
+function decideZone(src, gexData, lv, openPriceRef){
   const F = src.futuresPrice;
-  const O = src.openPrice || F;
+  // Use first-of-day open price as the stable SD zone center for the entire session
+  const O = openPriceRef || src.openPrice || F;
   const dte = src.dte;
   const iv = src.atmIV;
   const ivChg = src.ivChg;
@@ -2349,8 +2358,14 @@ function decideZone(src, gexData, lv){
       entrySub=`Block $${entry} (±1σ Watch)`; stopSub=`$${stop} (-1 block)`; targetSub=`Block $${target} (Open)`;
       winProb='~58%'; score=Math.min(score+8,78);
     } else {
-      verdict='WAIT';icon='⏳';verdictClass='neutral';
-      action='รอราคาออกจาก Neutral Zone (±0.5σ)'; tagline='Long Gamma — No-Trade Zone · ยังไม่มี Edge'; winProb='—'; score=50;
+      verdict='WAIT';icon='⏳';verdictClass='neutral';winProb='—';score=50;
+      if(quadrant==='upper_watch'||quadrant==='lower_watch'){
+        action='Caution Zone (±0.5–1σ) — รอยืนยัน signal ก่อน Fade';
+        tagline='Long Gamma · ใกล้ Watch Zone · Edge ต่ำ · รอ ±2σ ก่อนเปิด';
+      } else {
+        action='Neutral Zone (±0.5σ) — No-Trade · รอราคาออกจากกลาง';
+        tagline='Long Gamma — ราคายังอยู่กลางช่วง · ไม่มี Edge';
+      }
     }
   } else {
     if(quadrant==='upper_trend'){
@@ -2712,9 +2727,9 @@ function renderWallComparison(){
   if(vol_p){const g=calcGEX(vol_p);lvVol=calcLevels(g.rows,F);}
   if(oi_p&&vol_p){const c=mergeComposite(oi_p,vol_p,alpha);if(c){const g=calcGEX(c);lvComp=calcLevels(g.rows,F);}}
   else{lvComp=lvOI||lvVol;}
-  // GTBR from sd anchor
+  // GTBR from first-of-day snapshot (fixed session open)
   const mk=currentMode==='oi'?'oi':'intraday';
-  const ref=sdAnchor[mk]||src;
+  const ref=firstOfDay[mk]||src;
   const Fo=ref.openPrice||ref.futuresPrice||F;
   const rIV=ref.atmIV||src.atmIV;
   const rDTE=ref.dte||src.dte;
@@ -2766,7 +2781,9 @@ function renderAll(src){
   updateSkew(src.rows,src.futuresPrice,src.atmIV);
   renderGEX(src,gexData.rows,gexData.totalGex);
   updateLevels(lv,src.futuresPrice);
-  const decision = decideZone(src, gexData, lv);
+  const modeKeyR = currentMode==='oi' ? 'oi' : 'intraday';
+  const firstDayOpen = firstOfDay[modeKeyR]?.openPrice || src.openPrice;
+  const decision = decideZone(src, gexData, lv, firstDayOpen);
   renderDecisionEngine(decision, src);
   const mode = currentMode==='composite' ? 'intraday' : currentMode;
   const delta = computeSnapshotDelta(parsedData[mode], previousData[mode]);
@@ -2774,7 +2791,7 @@ function renderAll(src){
   updateBlockStrategy(decision?.sd1d);
   // ── Squeeze Detector ──────────────────────────────────
   const modeKeyS = currentMode==='oi' ? 'oi' : 'intraday';
-  const refS = sdAnchor[modeKeyS] || src;
+  const refS = firstOfDay[modeKeyS] || src;
   const FopenS = refS.openPrice || refS.futuresPrice || src.futuresPrice;
   const refIVS = refS.atmIV || src.atmIV;
   const sd1dS = (FopenS && refIVS) ? FopenS * (refIVS/100) * Math.sqrt(1/252) : 0;
@@ -2848,7 +2865,14 @@ async function loadSnapshot(idx,mode){
 function renderSnaps(list,mode){
   const row=document.getElementById('snapshot-row');
   if(!list.length){row.innerHTML='<span style="color:var(--gold-l);font-size:12px;">⚠ ยังไม่มีข้อมูลวันนี้ — รอข้อมูล commit ใหม่</span>';return;}
-  row.innerHTML=list.map((c,i)=>`<button class="snap-btn${i===0?' active':''}" onclick="selectSnap(${i},'${mode}')">${fmtTimeBKK(c.commit.author.date)}</button>`).join('');
+  const ak=anchorIdx[mode];
+  row.innerHTML=list.map((c,i)=>{
+    const pinned=i===ak;
+    return `<span class="snap-pair">` +
+      `<button class="snap-btn${i===0?' active':''}" onclick="selectSnap(${i},'${mode}')">${fmtTimeBKK(c.commit.author.date)}</button>` +
+      `<button class="pin-btn${pinned?' pinned':''}" onclick="setAnchor(${i},'${mode}')" title="${pinned?'📌 SD Anchor (คลิกเพื่อ unpin → auto)':'📌 กำหนดเป็น SD Anchor'}">📌</button>` +
+      `</span>`;
+  }).join('');
 }
 async function selectSnap(idx,mode){
   document.querySelectorAll('.snap-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
@@ -2858,6 +2882,53 @@ async function selectSnap(idx,mode){
     const src=mergeComposite(parsedData.oi,parsedData.intraday,alpha);
     if(src)renderAll(src);
   }
+}
+
+// ── SD Anchor label ─────────────────────────────────────
+function updateAnchorLabel(time,isManual){
+  const el=document.getElementById('anchor-label');
+  if(!el)return;
+  if(!time){el.textContent='📌 Auto';el.className='anchor-label';el.title='SD Anchor: snapshot แรกของวัน (อัตโนมัติ)';}
+  else if(isManual){el.textContent=`📌 ${time}`;el.className='anchor-label manual';el.title=`SD Anchor: manual @ ${time} BKK — คลิกปุ่มหมุดเพื่อ unpin`;}
+  else{el.textContent=`📌 ${time}`;el.className='anchor-label';el.title=`SD Anchor: snapshot แรกของวัน @ ${time} BKK`;}
+}
+
+// ── Set/unset manual SD Anchor ──────────────────────────
+async function setAnchor(idx,mode){
+  const list=commits[mode];
+  if(!list||!list.length)return;
+  const file=mode==='intraday'?'IntradayData.txt':'OIData.txt';
+
+  if(anchorIdx[mode]===idx){
+    // Toggle OFF — revert to auto (first of day)
+    anchorIdx[mode]=null;
+    // Reload actual first-of-day snapshot
+    const firstIdx=list.length-1;
+    try{
+      const rawFirst=await fetchFileAtCommit(file,list[firstIdx].sha);
+      firstOfDay[mode]=parseGBT(rawFirst);
+      const t=fmtTimeBKK(list[firstIdx].commit.author.date);
+      updateAnchorLabel(t,false);
+    }catch(e){firstOfDay[mode]=null;}
+  } else {
+    // Pin this snapshot as SD Anchor
+    anchorIdx[mode]=idx;
+    try{
+      const raw=await fetchFileAtCommit(file,list[idx].sha);
+      firstOfDay[mode]=parseGBT(raw);
+      const t=fmtTimeBKK(list[idx].commit.author.date);
+      updateAnchorLabel(t,true);
+    }catch(e){anchorIdx[mode]=null;}
+  }
+
+  // Re-render pin buttons to show new state
+  renderSnaps(list,mode);
+
+  // Re-render dashboard with updated SD reference
+  const src=currentMode==='composite'
+    ?mergeComposite(parsedData.oi,parsedData.intraday,alpha)
+    :parsedData[currentMode];
+  if(src)renderAll(src);
 }
 
 
@@ -2880,6 +2951,11 @@ async function ensureMode(mode){
         const firstIdx=today.length-1;  // newest-first list → last = earliest of day
         const rawFirst=await fetchFileAtCommit(file,today[firstIdx].sha);
         firstOfDay[mode]=parseGBT(rawFirst);
+        // Update anchor label only if this is the active mode and no manual pin
+        if(mode===currentMode&&anchorIdx[mode]===null){
+          const t=fmtTimeBKK(today[firstIdx].commit.author.date);
+          updateAnchorLabel(t,false);
+        }
       }
     }catch(e){
       row.innerHTML=`<span style="color:var(--red-l);font-size:12px;">⚠ ${e.message}</span>`;
@@ -2892,8 +2968,8 @@ async function refreshData(){
   btn.classList.add('spinning');btn.disabled=true;
   commits={intraday:[],oi:[]};parsedData={intraday:null,oi:null};
   previousData={intraday:null,oi:null};currentMeta={intraday:null,oi:null};previousMeta={intraday:null,oi:null};
-  sessionIVs=[];firstOfDay={intraday:null,oi:null};
-  sdAnchor={intraday:null,oi:null};sdAnchorTime={intraday:0,oi:0};
+  sessionIVs=[];firstOfDay={intraday:null,oi:null};anchorIdx={intraday:null,oi:null};
+  updateAnchorLabel(null,null);
   await ensureMode(currentMode==='oi'?'oi':'intraday');
   if(currentMode==='composite'){await ensureMode('oi');await ensureMode('intraday');}
   const src=currentMode==='composite'?mergeComposite(parsedData.oi,parsedData.intraday,alpha):parsedData[currentMode];
@@ -3279,17 +3355,18 @@ function renderVolChart(parsed){
 function updateVCMetrics(parsed){
   if(!parsed)return;
   const F=parsed.futuresPrice;
-  const openF=parsed.openPrice||F;
+  // Use first-of-day open price as SD center (same as main dashboard)
+  const openF=(firstOfDay['intraday']||parsed).openPrice||parsed.openPrice||F;
   const sig=parsed.atmIV/100;
   const dte=parsed.dte;
-  const sd1=(F*sig*Math.sqrt(dte/252));
+  const sd1=(openF*sig*Math.sqrt(dte/252));
   const sd2=2*sd1;
-  const sd1d=F*sig*Math.sqrt(1/252);
+  const sd1d=openF*sig*Math.sqrt(1/252);
 
   const el=(id)=>document.getElementById(id);
   if(el('vc-futures')){el('vc-futures').textContent='$'+F.toFixed(2);el('vc-futures-sub').textContent='Contract: GC / OG';}
-  if(el('vc-1sd')){el('vc-1sd').textContent='±$'+sd1.toFixed(1);el('vc-1sd-sub').textContent=`↑${(F+sd1).toFixed(1)} / ↓${(F-sd1).toFixed(1)}`;}
-  if(el('vc-2sd')){el('vc-2sd').textContent='±$'+sd2.toFixed(1);el('vc-2sd-sub').textContent=`↑${(F+sd2).toFixed(1)} / ↓${(F-sd2).toFixed(1)}`;}
+  if(el('vc-1sd')){el('vc-1sd').textContent='±$'+sd1.toFixed(1);el('vc-1sd-sub').textContent=`↑${(openF+sd1).toFixed(1)} / ↓${(openF-sd1).toFixed(1)}`;}
+  if(el('vc-2sd')){el('vc-2sd').textContent='±$'+sd2.toFixed(1);el('vc-2sd-sub').textContent=`↑${(openF+sd2).toFixed(1)} / ↓${(openF-sd2).toFixed(1)}`;}
   if(el('vc-1dd')){el('vc-1dd').textContent='±$'+sd1d.toFixed(1);el('vc-1dd-sub').textContent='Expected daily ±move';}
 
   // Diff from spot
@@ -3310,15 +3387,17 @@ function renderSDLevels(parsed){
   const ct=document.getElementById('vc-sd-table');
   if(!ct||!parsed)return;
   const F=parsed.futuresPrice;
+  // SD levels centered on first-of-day open (same reference as main dashboard)
+  const openF=(firstOfDay['intraday']||parsed).openPrice||parsed.openPrice||F;
   const sig=parsed.atmIV/100;
   const dte=parsed.dte;
-  const sd1=F*sig*Math.sqrt(dte/252);
+  const sd1=openF*sig*Math.sqrt(dte/252);
   const sd2=2*sd1;
   const sd3=3*sd1;
 
-  // Round-number lines at multiples of 25 in range ±sd3
-  const lo=Math.floor((F-sd3)/25)*25;
-  const hi=Math.ceil((F+sd3)/25)*25;
+  // Round-number lines at multiples of 25 in range ±sd3 around open
+  const lo=Math.floor((openF-sd3)/25)*25;
+  const hi=Math.ceil((openF+sd3)/25)*25;
   const rounds=[];
   for(let k=lo;k<=hi;k+=25)if(k>0)rounds.push(k);
 
@@ -3337,17 +3416,17 @@ function renderSDLevels(parsed){
     <th style="padding:4px 10px;text-align:right;color:var(--muted);">Lower</th>
     <th style="padding:4px 10px;color:var(--muted);">Width</th>
   </tr></thead><tbody>`;
-  html+=row('3σ Range',F+sd3,F-sd3,'var(--purple-l)');
-  html+=row('2σ Range',F+sd2,F-sd2,'var(--blue-l)');
-  html+=row('1σ Range',F+sd1,F-sd1,'var(--green-l)');
-  html+=row('1σ Daily',F+F*sig*Math.sqrt(1/252),F-F*sig*Math.sqrt(1/252),'var(--muted)');
+  html+=row('3σ Range',openF+sd3,openF-sd3,'var(--purple-l)');
+  html+=row('2σ Range',openF+sd2,openF-sd2,'var(--blue-l)');
+  html+=row('1σ Range',openF+sd1,openF-sd1,'var(--green-l)');
+  html+=row('1σ Daily',openF+openF*sig*Math.sqrt(1/252),openF-openF*sig*Math.sqrt(1/252),'var(--muted)');
   html+=`</tbody></table>`;
 
   // Round numbers sub-table
   html+=`<div style="margin-top:10px;"><div style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:700;">ROUND NUMBERS IN RANGE (ทุก 25 pts)</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;">`;
   rounds.forEach(k=>{
-    const dist=k-F;
+    const dist=k-openF;  // distance from open (SD zone center)
     const inSd1=Math.abs(dist)<=sd1;
     const inSd2=Math.abs(dist)<=sd2&&!inSd1;
     const bg=inSd1?'rgba(46,160,67,0.15)':inSd2?'rgba(31,111,235,0.12)':'rgba(48,54,61,0.5)';
