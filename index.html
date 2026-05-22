@@ -2502,6 +2502,13 @@ function renderSnapshotDelta(delta,mode){
     if(upList)upList.innerHTML=msg;
     if(dnList)dnList.innerHTML=msg;
     if(metaEl)metaEl.textContent='Snapshot เก่าสุด — ไม่มีข้อมูลก่อนหน้าให้เปรียบเทียบ';
+    // ── Reset totals & quadrant so stale values don't linger ──
+    const ctEl2=document.getElementById('delta-call-total');
+    const ptEl2=document.getElementById('delta-put-total');
+    const qdEl2=document.getElementById('delta-quadrant');
+    if(ctEl2){ctEl2.textContent='—';ctEl2.className='zp-out-val val-n';}
+    if(ptEl2){ptEl2.textContent='—';ptEl2.className='zp-out-val val-n';}
+    if(qdEl2){qdEl2.textContent='—';qdEl2.className='zp-out-val val-n';}
     return;
   }
   const ctEl=document.getElementById('delta-call-total');
@@ -2510,14 +2517,20 @@ function renderSnapshotDelta(delta,mode){
   if(ctEl){ctEl.textContent=`${delta.callTotal>=0?'+':''}${delta.callTotal.toLocaleString()}`;ctEl.className=`zp-out-val ${delta.callTotal>=0?'val-green':'val-red'}`;}
   if(ptEl){ptEl.textContent=`${delta.putTotal>=0?'+':''}${delta.putTotal.toLocaleString()}`;ptEl.className=`zp-out-val ${delta.putTotal>=0?'val-red':'val-green'}`;}
   if(qdEl){
-    const cUp=delta.callTotal>0, pUp=delta.putTotal>0;
-    const cDn=delta.callTotal<0, pDn=delta.putTotal<0;
-    const cDom=Math.abs(delta.callTotal)>Math.abs(delta.putTotal);
-    if(cUp&&pDn)      {qdEl.textContent='🟢 Call Build / Put Unwind';qdEl.className='zp-out-val val-green';}
-    else if(pUp&&cDn) {qdEl.textContent='🔴 Put Build / Call Unwind';qdEl.className='zp-out-val val-red';}
-    else if(cUp&&pUp) {qdEl.textContent=cDom?'📈 Call > Put Build-up':'📈 Put > Call Build-up';qdEl.className='zp-out-val val-gold';}
-    else if(cDn&&pDn) {qdEl.textContent='⬇ Both Unwind — Position Exit';qdEl.className='zp-out-val val-n';}
-    else              {qdEl.textContent='⚖ Mixed';qdEl.className='zp-out-val val-n';}
+    const ct=delta.callTotal, pt=delta.putTotal;
+    const cUp=ct>0, cDn=ct<0, cFlat=ct===0;
+    const pUp=pt>0, pDn=pt<0, pFlat=pt===0;
+    const cDom=Math.abs(ct)>Math.abs(pt);
+    // Both non-zero → 4 directional quadrants
+    if     (cUp&&pDn)   {qdEl.textContent='🟢 Call Build / Put Unwind';qdEl.className='zp-out-val val-green';}
+    else if(pUp&&cDn)   {qdEl.textContent='🔴 Put Build / Call Unwind';qdEl.className='zp-out-val val-red';}
+    else if(cUp&&pUp)   {qdEl.textContent=cDom?'📈 Call > Put Build-up':'📈 Put > Call Build-up';qdEl.className='zp-out-val val-gold';}
+    else if(cDn&&pDn)   {qdEl.textContent='⬇ Both Unwind — Position Exit';qdEl.className='zp-out-val val-n';}
+    // One side flat (zero net change)
+    else if(cFlat&&pFlat){qdEl.textContent='➖ No Net Change';qdEl.className='zp-out-val val-n';}
+    else if(cFlat)      {qdEl.textContent=pUp?'🔴 Put Build (Calls Flat)':'⬇ Put Unwind (Calls Flat)';qdEl.className=`zp-out-val ${pUp?'val-red':'val-n'}`;}
+    else if(pFlat)      {qdEl.textContent=cUp?'🟢 Call Build (Puts Flat)':'⬇ Call Unwind (Puts Flat)';qdEl.className=`zp-out-val ${cUp?'val-green':'val-n'}`;}
+    else                {qdEl.textContent='⚖ Mixed';qdEl.className='zp-out-val val-n';}
   }
   try{
     const mk=mode==='oi'?'oi':'intraday';
