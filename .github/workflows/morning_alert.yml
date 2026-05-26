@@ -1,0 +1,31 @@
+name: GBT Morning Telegram Alert
+
+on:
+  schedule:
+    - cron: "0 0 * * 1-5"   # 07:00 BKK (UTC+7) — เปิดตลาด
+    - cron: "0 3 * * 1-5"   # 10:00 BKK — กลางเช้า
+    - cron: "0 6 * * 1-5"   # 13:00 BKK — บ่าย
+  workflow_dispatch:  # รัน manual ได้จาก GitHub Actions tab
+
+jobs:
+  send-alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Telegram alert
+        env:
+          TELEGRAM_TOKEN:  ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python telegram_alert.py
