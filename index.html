@@ -193,6 +193,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .zde-header{display:flex;align-items:center;justify-content:space-between;padding:9px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
 .zde-title{font-size:11px;font-weight:800;color:var(--gold-l);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px;}
 .zde-conf{font-size:11px;color:var(--muted);font-weight:700;}
+.ts-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.ts-btn{padding:4px 10px;font-size:11px;font-weight:600;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.ts-btn.active{background:var(--surface2);color:var(--text);}
+.ts-btn#ts-btn-mr.active{color:#8957e5;}
+.ts-btn#ts-btn-mo.active{color:var(--gold);}
 .zde-conf .zde-confnum{color:var(--text);font-size:13px;margin-left:4px;font-family:'Fira Code',monospace;}
 .zde-body{display:grid;grid-template-columns:260px 1fr 320px;gap:0;}
 .zde-verdict{padding:18px 20px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;}
@@ -477,7 +482,13 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <div class="zde-card" id="zde-card">
       <div class="zde-header">
         <div class="zde-title">🎯 Today's Edge — Zone Decision Engine</div>
-        <div class="zde-conf">Confidence: <span class="zde-confnum" id="zde-confnum">—</span></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="ts-toggle" id="ts-toggle">
+            <button class="ts-btn" id="ts-btn-mr" onclick="setTradingStyle('meanreversion')">↩️ Mean Reversion</button>
+            <button class="ts-btn" id="ts-btn-mo" onclick="setTradingStyle('momentum')">🚀 Momentum</button>
+          </div>
+          <div class="zde-conf">Confidence: <span class="zde-confnum" id="zde-confnum">—</span></div>
+        </div>
       </div>
       <div class="zde-body">
         <div class="zde-verdict neutral" id="zde-verdict">
@@ -1682,6 +1693,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 // ── State ──────────────────────────────────────────────
 let GH_TOKEN='', DATA_REPO='pageth/Vol2VolData';
 let currentMode='intraday', alpha=0.40;
+let tradingStyle='meanreversion'; // 'momentum' | 'meanreversion'
 let commits={intraday:[],oi:[]};
 let parsedData={intraday:null,oi:null};
 let previousData={intraday:null,oi:null};   // snapshot BEFORE the currently loaded one
@@ -2249,6 +2261,21 @@ function nearestBlock(p,bs=25){return Math.round(p/bs)*bs;}
 function blockAbove(p,bs=25){return Math.ceil((p+0.001)/bs)*bs;}
 function blockBelow(p,bs=25){return Math.floor((p-0.001)/bs)*bs;}
 
+function setTradingStyle(style){
+  tradingStyle = style;
+  document.getElementById('ts-btn-mr').classList.toggle('active', style==='meanreversion');
+  document.getElementById('ts-btn-mo').classList.toggle('active', style==='momentum');
+  // Re-render decision engine with new style
+  const src = parsedData[currentMode==='composite'?'intraday':currentMode];
+  if(src){
+    const gexData = currentMode==='composite'
+      ? mergeComposite(calcGEX(parsedData.oi), calcGEX(parsedData.intraday), alpha)
+      : calcGEX(src);
+    const lv = calcLevels(gexData.rows, src.futuresPrice);
+    renderDecisionEngine(decideZone(src, gexData, lv, window._firstDayOpen||null), src);
+  }
+}
+
 function decideZone(src, gexData, lv, openPriceRef){
   const F = src.futuresPrice;
   // Use first-of-day open price as the stable SD zone center for the entire session
@@ -2261,25 +2288,22 @@ function decideZone(src, gexData, lv, openPriceRef){
   const sig = iv/100;
   const sd1d = O * sig * Math.sqrt(1/365);
   const sd2d = 2 * sd1d;
-  const upTrigger = O + sd1d;
-  const dnTrigger = O - sd1d;
-  const upActionTop = O + sd2d;
-  const dnActionBot = O - sd2d;
   const cw = lv?.callWall?.strike || null;
   const pw = lv?.putWall?.strike || null;
-  const dgc = lv?.dgcWall || null;
-  const flipUp = lv?.flipAbove?.strike || null;
-  const flipDn = lv?.flipBelow?.strike || null;
   const totalGex = gexData.totalGex / 1e6;
   const longGammaRegime = totalGex >= 0;
   const distFromOpen = F - O;
   const sdPos = sd1d > 0 ? distFromOpen / sd1d : 0;
   const absSdPos = Math.abs(sdPos);
+  const isMR = tradingStyle === 'meanreversion';
+
+  // Fixed SL/TP values
+  const SL_DIST = 12.5;
+  const TP_DIST = 25.0;
 
   let quadrant, quadrantNote, zoneLabel;
 
   // Quadrant determination — 3-tier zone system
-  // ±1σ = Watch (Noise Zone), ±2σ = Action Zone (Recommended), ±3σ = Extreme Zone
   if(longGammaRegime){
     if(absSdPos < 0.5){
       quadrant='neutral';        quadrantNote='Neutral Zone (±0.5σ) · Long Gamma → No-Trade · รอราคาออกจากกลาง';          zoneLabel='Neutral';
@@ -2305,9 +2329,17 @@ function decideZone(src, gexData, lv, openPriceRef){
     if(absSdPos < 0.5){
       quadrant='neutral_neg'; quadrantNote='Neutral Zone · Short Gamma → ระวัง ตลาดอาจ vol ได้'; zoneLabel='Neutral (SG)';
     } else if(sdPos > 0){
-      quadrant='upper_trend'; quadrantNote='Short Gamma Uptrend → Dealer ซื้อตาม → Momentum ขึ้น'; zoneLabel='Momentum ↑';
+      if(isMR){
+        quadrant='upper_fade'; quadrantNote='Short Gamma · MR Fade — ราคาขึ้นแต่คุณ Fade → เสี่ยงสูง โปรดระวัง'; zoneLabel='MR Fade ↓';
+      } else {
+        quadrant='upper_trend'; quadrantNote='Short Gamma Uptrend → Dealer ซื้อตาม → Momentum ขึ้น'; zoneLabel='Momentum ↑';
+      }
     } else {
-      quadrant='lower_trend'; quadrantNote='Short Gamma Downtrend → Dealer ขายตาม → Momentum ลง'; zoneLabel='Momentum ↓';
+      if(isMR){
+        quadrant='lower_fade'; quadrantNote='Short Gamma · MR Fade — ราคาลงแต่คุณ Fade → เสี่ยงสูง โปรดระวัง'; zoneLabel='MR Fade ↑';
+      } else {
+        quadrant='lower_trend'; quadrantNote='Short Gamma Downtrend → Dealer ขายตาม → Momentum ลง'; zoneLabel='Momentum ↓';
+      }
     }
   }
 
@@ -2328,6 +2360,7 @@ function decideZone(src, gexData, lv, openPriceRef){
     else{score+=5;reasons.push({icon:'🔻',text:`IV ลด ${Math.abs(ivChg).toFixed(2)}%`});}
   }
   reasons.push({icon:'📏',text:`ราคาอยู่ที่ ${sdPos>=0?'+':''}${sdPos.toFixed(2)}σ จาก Open ($${O.toFixed(2)})`});
+  if(isMR) reasons.push({icon:'↩️',text:'Trading Style: Mean Reversion — Fade ตามทิศทาง SD Boundary'});
   // IV Divergence signal
   if(ivDivBearish){
     score-=12;
@@ -2341,51 +2374,53 @@ function decideZone(src, gexData, lv, openPriceRef){
   let verdict='NEUTRAL',icon='⏳',action='',tagline='',verdictClass='neutral';
   let winProb='—';
 
-  // Block trade grid: entry/stop/target snapped to 25$ blocks
+  // ── Helper: build LONG / SHORT plan with fixed SL/TP ──
+  function _longPlan(subLabel){
+    entry=F; stop=F-SL_DIST; target=F+TP_DIST;
+    entrySub=`Market ~$${F.toFixed(2)} ${subLabel}`; stopSub=`$${stop.toFixed(2)} (−$${SL_DIST})`; targetSub=`$${target.toFixed(2)} (+$${TP_DIST})`;
+  }
+  function _shortPlan(subLabel){
+    entry=F; stop=F+SL_DIST; target=F-TP_DIST;
+    entrySub=`Market ~$${F.toFixed(2)} ${subLabel}`; stopSub=`$${stop.toFixed(2)} (+$${SL_DIST})`; targetSub=`$${target.toFixed(2)} (−$${TP_DIST})`;
+  }
+
+  // Long Gamma regime → always Mean Reversion (Fade) regardless of style
   if(longGammaRegime){
-    // ── UPPER SIDE ────────────────────────────────────────
     if(quadrant==='upper_extreme'){
       verdict='SHORT';icon='🔴';verdictClass='short';
       action='🔥 Extreme Fade — Short ±3σ (High Conviction · เกิดน้อยมาก)';
       tagline='Long Gamma → ดีลเลอร์ต้องขายหนัก → กลับแรง';
-      entry=blockAbove(F); stop=entry+50; target=nearestBlock(O);
-      entrySub=`Block $${entry} (±3σ Extreme)`; stopSub=`$${stop} (+2 blocks)`; targetSub=`Block $${target} (Open)`;
+      _shortPlan('(±3σ Extreme)');
       winProb='~85%'; score=Math.min(score+25,98);
     } else if(quadrant==='upper_action_2'){
       verdict='SHORT';icon='🔴';verdictClass='short';
       action='⭐ Recommended Fade — Short ±2σ Action Zone';
       tagline='Long Gamma → Statistical Edge สูง → กลับหา Open';
-      entry=blockAbove(F); stop=entry+25; target=nearestBlock(O);
-      entrySub=`Block $${entry} (±2σ Action Zone)`; stopSub=`$${stop} (+1 block)`; targetSub=`Block $${target} (Open)`;
+      _shortPlan('(±2σ Action Zone)');
       winProb='~78%'; score=Math.min(score+20,95);
     } else if(quadrant==='upper_action'){
       verdict='SHORT';icon='🔴';verdictClass='short';
       action='Fade ±1σ — Watch Zone (Noise สูงกว่า ±2σ · ระวัง)';
       tagline='Long Gamma → Fade ได้ แต่ Edge ต่ำกว่า Action Zone';
-      entry=blockAbove(F); stop=entry+25; target=nearestBlock(O);
-      entrySub=`Block $${entry} (±1σ Watch)`; stopSub=`$${stop} (+1 block)`; targetSub=`Block $${target} (Open)`;
+      _shortPlan('(±1σ Watch)');
       winProb='~58%'; score=Math.min(score+8,78);
-    // ── LOWER SIDE ────────────────────────────────────────
     } else if(quadrant==='lower_extreme'){
       verdict='LONG';icon='🟢';verdictClass='long';
       action='🔥 Extreme Fade — Long ±3σ (High Conviction · เกิดน้อยมาก)';
       tagline='Long Gamma → ดีลเลอร์ต้องซื้อหนัก → กลับแรง';
-      entry=blockBelow(F); stop=entry-50; target=nearestBlock(O);
-      entrySub=`Block $${entry} (±3σ Extreme)`; stopSub=`$${stop} (-2 blocks)`; targetSub=`Block $${target} (Open)`;
+      _longPlan('(±3σ Extreme)');
       winProb='~85%'; score=Math.min(score+25,98);
     } else if(quadrant==='lower_action_2'){
       verdict='LONG';icon='🟢';verdictClass='long';
       action='⭐ Recommended Fade — Long ±2σ Action Zone';
       tagline='Long Gamma → Statistical Edge สูง → กลับหา Open';
-      entry=blockBelow(F); stop=entry-25; target=nearestBlock(O);
-      entrySub=`Block $${entry} (±2σ Action Zone)`; stopSub=`$${stop} (-1 block)`; targetSub=`Block $${target} (Open)`;
+      _longPlan('(±2σ Action Zone)');
       winProb='~78%'; score=Math.min(score+20,95);
     } else if(quadrant==='lower_action'){
       verdict='LONG';icon='🟢';verdictClass='long';
       action='Fade ±1σ — Watch Zone (Noise สูงกว่า ±2σ · ระวัง)';
       tagline='Long Gamma → Fade ได้ แต่ Edge ต่ำกว่า Action Zone';
-      entry=blockBelow(F); stop=entry-25; target=nearestBlock(O);
-      entrySub=`Block $${entry} (±1σ Watch)`; stopSub=`$${stop} (-1 block)`; targetSub=`Block $${target} (Open)`;
+      _longPlan('(±1σ Watch)');
       winProb='~58%'; score=Math.min(score+8,78);
     } else {
       verdict='WAIT';icon='⏳';verdictClass='neutral';winProb='—';score=50;
@@ -2398,29 +2433,48 @@ function decideZone(src, gexData, lv, openPriceRef){
       }
     }
   } else {
-    if(quadrant==='upper_trend'){
-      verdict='LONG';icon='🟢';verdictClass='long';
-      action='Momentum Long — Short Gamma ตามขึ้น Block ต่อ Block';
-      tagline='Dealer ซื้อตาม → ไล่ทีละ Block 25$';
-      entry = blockAbove(F);            // breakout above current block
-      stop  = blockBelow(F);            // block below current
-      target= cw ? blockBelow(cw) : blockAbove(entry); // just under Call Wall block
-      entrySub=`Block $${entry} (breakout)`; stopSub=`Block $${stop}`; targetSub=cw?`Block $${target} (ใต้ Call Wall $${cw})`:`Block $${target}`;
-      winProb='~55%'; score=Math.max(score+5,40);
-    } else if(quadrant==='lower_trend'){
-      verdict='SHORT';icon='🔴';verdictClass='short';
-      action='Momentum Short — Short Gamma ตามลง Block ต่อ Block';
-      tagline='Dealer ขายตาม → ไล่ทีละ Block 25$';
-      entry = blockBelow(F);            // breakdown below current block
-      stop  = blockAbove(F);            // block above current
-      target= pw ? blockAbove(pw) : blockBelow(entry); // just above Put Wall block
-      entrySub=`Block $${entry} (breakdown)`; stopSub=`Block $${stop}`; targetSub=pw?`Block $${target} (เหนือ Put Wall $${pw})`:`Block $${target}`;
-      winProb='~55%'; score=Math.max(score+5,40);
+    // Short Gamma regime
+    if(isMR){
+      // Mean Reversion: fade the Short Gamma move
+      if(quadrant==='upper_fade'){
+        verdict='SHORT';icon='🔴';verdictClass='short';
+        action='↩️ MR Fade — Short Gamma แต่ราคาสูงเกิน → Fade กลับ (เสี่ยงสูง)';
+        tagline='Short Gamma = Momentum แต่ MR Style → Fade โปรดระวัง';
+        _shortPlan('(MR Fade ↓)');
+        winProb='~45%'; score=Math.max(score-5,35);
+      } else if(quadrant==='lower_fade'){
+        verdict='LONG';icon='🟢';verdictClass='long';
+        action='↩️ MR Fade — Short Gamma แต่ราคาลงมากแล้ว → Fade กลับ (เสี่ยงสูง)';
+        tagline='Short Gamma = Momentum แต่ MR Style → Fade โปรดระวัง';
+        _longPlan('(MR Fade ↑)');
+        winProb='~45%'; score=Math.max(score-5,35);
+      } else {
+        verdict='WAIT';icon='⏳';verdictClass='neutral';
+        action='รอทิศทาง — Short Gamma กลาง · MR รอ Edge ที่ชัดกว่านี้';
+        tagline='Short Gamma — Spike ได้ทั้งสองทาง · ยังไม่มี MR Edge ที่ชัด';
+        winProb='—';score=45;
+      }
     } else {
-      verdict='WAIT';icon='⏳';verdictClass='neutral';
-      action='รอทิศทาง — Short Gamma กลาง';tagline='Short Gamma — Spike ได้ทั้งสองทาง รอ Block Break';winProb='—';score=45;
+      // Momentum: follow the Short Gamma trend
+      if(quadrant==='upper_trend'){
+        verdict='LONG';icon='🟢';verdictClass='long';
+        action='Momentum Long — Short Gamma ตามขึ้น';
+        tagline='Dealer ซื้อตาม → ราคาต่อขึ้น';
+        _longPlan('(Momentum ↑)');
+        winProb='~55%'; score=Math.max(score+5,40);
+      } else if(quadrant==='lower_trend'){
+        verdict='SHORT';icon='🔴';verdictClass='short';
+        action='Momentum Short — Short Gamma ตามลง';
+        tagline='Dealer ขายตาม → ราคาต่อลง';
+        _shortPlan('(Momentum ↓)');
+        winProb='~55%'; score=Math.max(score+5,40);
+      } else {
+        verdict='WAIT';icon='⏳';verdictClass='neutral';
+        action='รอทิศทาง — Short Gamma กลาง';tagline='Short Gamma — Spike ได้ทั้งสองทาง รอ Break';winProb='—';score=45;
+      }
     }
   }
+
   let rrVal=null;
   if(entry&&stop&&target){const sd=Math.abs(entry-stop),pd=Math.abs(target-entry);rrVal=sd>0?pd/sd:null;}
   score=Math.max(0,Math.min(100,Math.round(score)));
@@ -2831,6 +2885,7 @@ function renderAll(src){
   updateLevels(lv,src.futuresPrice);
   const modeKeyR = currentMode==='oi' ? 'oi' : 'intraday';
   const firstDayOpen = firstOfDay[modeKeyR]?.openPrice || src.openPrice;
+  window._firstDayOpen = firstDayOpen; // cache for setTradingStyle re-render
   const decision = decideZone(src, gexData, lv, firstDayOpen);
   renderDecisionEngine(decision, src);
   const mode = currentMode==='composite' ? 'intraday' : currentMode;
@@ -3612,6 +3667,8 @@ function initTVWidget(){
 async function init(){
   updateClock();setInterval(updateClock,30000);
   recoveryCalc();
+  // Init trading style toggle
+  setTradingStyle(tradingStyle);
   await ensureMode('intraday');
   if(parsedData.intraday)renderAll(parsedData.intraday);
   // Auto-refresh every 5 min — soft mode preserves 📌 pin and sessionIVs
